@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>paraSim | 3D Cow Anatomy & 18 Treifot Explorer (Masechet Chullin)</title>
+  <meta name="description" content="Interactive 3D Bovine Anatomy, 18 Treifot Simulator, and Bedikat HaRe'ah Explorer for Talmud Masechet Chullin and Shulchan Aruch Yoreh De'ah.">
+
+  <!-- Modern Web Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;600;700;900&family=Heebo:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./style.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <!-- Sketchfab Viewer API for programmatic explode, node isolation, and 3D organ clicks -->
+  <script src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
+</head>
+<body class="theme-dark">
+  <div id="app" class="app-layout">
+
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+            <path d="M7 10l5 5 5-5"/>
+            <circle cx="9" cy="9" r="1.5" fill="currentColor"/>
+            <circle cx="15" cy="9" r="1.5" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title">
+            <span class="he-title">פרה-סים</span>
+            <span class="brand-divider">•</span>
+            <span class="en-title">paraSim</span>
+          </div>
+          <div class="brand-subtitle" data-i18n="tagline">אטלס תלת-ממדי לאנטומיית הבקר וי"ח טרפות • מסכת חולין ויו"ד</div>
+        </div>
+      </div>
+
+      <!-- Mode Navigation Tabs -->
+      <nav class="header-nav">
+        <button id="nav-mode-explore" class="nav-tab active" data-mode="explore">
+          <span class="tab-icon">🐄</span>
+          <span data-i18n="modeExplore">חקר תלת-ממד</span>
+        </button>
+        <button id="nav-mode-shechita" class="nav-tab" data-mode="shechita">
+          <span class="tab-icon">🔪</span>
+          <span data-i18n="modeShechita">הלכות שחיטה (י"ב-י"ח)</span>
+        </button>
+        <button id="nav-mode-treifot" class="nav-tab" data-mode="treifot">
+          <span class="tab-icon">📜</span>
+          <span data-i18n="modeTreifot">י"ח טרפות (חולין ג')</span>
+        </button>
+        <button id="nav-mode-bedikah" class="nav-tab" data-mode="bedikah">
+          <span class="tab-icon">🔍</span>
+          <span data-i18n="modeBedikah">סימולטור בדיקה</span>
+        </button>
+        <button id="nav-mode-specimens" class="nav-tab" data-mode="specimens">
+          <span class="tab-icon">🏛️</span>
+          <span data-i18n="modeSpecimens">סריקות Z-Anatomy</span>
+        </button>
+      </nav>
+
+      <!-- Global Controls -->
+      <div class="header-actions">
+        <button id="btn-sound-toggle" class="btn-icon" title="Toggle Sound / צלילים" aria-label="Toggle Sound">
+          <span class="sound-on">🔊</span>
+          <span class="sound-off hidden">🔇</span>
+        </button>
+        <button id="btn-lang-toggle" class="btn-pill" title="Switch Language / החלף שפה">
+          <span class="lang-text">EN</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Workspace -->
+    <main class="app-workspace">
+
+      <!-- Left / Side Floating Anatomy Toolbar (Biosphera-style) -->
+      <aside class="floating-toolbar">
+        <!-- Cow Appearance Mode Switch -->
+        <div class="toolbar-section">
+          <div class="toolbar-title" data-i18n="cowAppearance">מראה הפרה</div>
+          <div class="cow-skin-switch">
+            <button id="btn-skin-solid" class="skin-mode-btn" title="Solid Holstein Cow">
+              <span>🐄</span> <span data-i18n="skinSolid">פרה מלאה</span>
+            </button>
+            <button id="btn-skin-muscle" class="skin-mode-btn" title="Muscles & Meat (בשר)">
+              <span>🥩</span> <span data-i18n="specimenMuscles">שרירים ובשר</span>
+            </button>
+            <button id="btn-skin-xray" class="skin-mode-btn active" title="Holographic X-Ray">
+              <span>✨</span> <span data-i18n="skinXray">רנטגן שקוף</span>
+            </button>
+            <button id="btn-skin-none" class="skin-mode-btn" title="Internal Organs Only">
+              <span>🫀</span> <span data-i18n="skinNone">איברים בלבד</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="toolbar-section">
+          <div class="toolbar-title" data-i18n="systemsLayers">מערכות איברים</div>
+          <div class="system-toggles">
+            <button class="sys-btn active" data-system="silhouette">
+              <span class="sys-indicator" style="background:#38bdf8;"></span>
+              <span data-i18n="sysBody">גוף חיצוני (X-Ray)</span>
+            </button>
+            <button class="sys-btn active" data-system="muscles">
+              <span class="sys-indicator" style="background:#dc2626;"></span>
+              <span data-i18n="sysMuscles">שרירים ובשר (Meat)</span>
+            </button>
+            <button class="sys-btn active" data-system="skeletal">
+              <span class="sys-indicator" style="background:#e2e8f0;"></span>
+              <span data-i18n="sysSkeletal">שלד וצלעות</span>
+            </button>
+            <button class="sys-btn active" data-system="respiratory">
+              <span class="sys-indicator" style="background:#60a5fa;"></span>
+              <span data-i18n="sysRespiratory">קנה וריאה (אונות)</span>
+            </button>
+            <button class="sys-btn active" data-system="digestive">
+              <span class="sys-indicator" style="background:#f59e0b;"></span>
+              <span data-i18n="sysDigestive">4 הקיבות והמעיים</span>
+            </button>
+            <button class="sys-btn active" data-system="vital">
+              <span class="sys-indicator" style="background:#ef4444;"></span>
+              <span data-i18n="sysVital">לב, כבד, מרה וטחול</span>
+            </button>
+            <button class="sys-btn active" data-system="nervous">
+              <span class="sys-indicator" style="background:#a855f7;"></span>
+              <span data-i18n="sysNervous">מוח וחוט השדרה</span>
+            </button>
+            <button class="sys-btn active" data-system="limbs">
+              <span class="sys-indicator" style="background:#10b981;"></span>
+              <span data-i18n="sysLimbs">צומת הגידים והירך</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Camera Preset Angles (Anatomical Planes) -->
+        <div class="toolbar-section">
+          <div class="toolbar-title" data-i18n="viewAngles">מנחי צפייה</div>
+          <div class="view-presets-grid">
+            <button class="view-btn" data-view="lateral-right" title="Lateral Right (ימין)">R ימין</button>
+            <button class="view-btn" data-view="lateral-left" title="Lateral Left (שמאל)">L שמאל</button>
+            <button class="view-btn" data-view="dorsal" title="Dorsal (עליון)">D גב</button>
+            <button class="view-btn" data-view="ventral" title="Ventral (תחתון)">V גחון</button>
+            <button class="view-btn" data-view="cranial" title="Cranial (ראש)">C ראש</button>
+            <button class="view-btn" data-view="caudal" title="Caudal (אחורי)">C זנב</button>
+          </div>
+          <div class="camera-util-btns">
+            <button id="btn-reset-cam" class="util-btn">
+              <span>🔄</span> <span data-i18n="resetCam">איפוס מבט</span>
+            </button>
+            <button id="btn-auto-rotate" class="util-btn">
+              <span>💫</span> <span data-i18n="autoRotate">סיבוב אוטומטי</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Exploded View Slider (Online3DViewer style) -->
+        <div class="toolbar-section">
+          <div class="toolbar-slider-label">
+            <span data-i18n="explodeView">פירוק איברים (Dissect)</span>
+            <span id="explode-val">0%</span>
+          </div>
+          <input type="range" id="slider-explode" min="0" max="100" value="0" class="range-slider">
+        </div>
+
+        <!-- Section Slicing Plane Tool (Biosphera & Online3DViewer style) -->
+        <div class="toolbar-section">
+          <div class="toolbar-title" data-i18n="sectionSlicing">חיתוך חללים פנימיים (Section)</div>
+          <div class="slice-plane-controls">
+            <button id="btn-toggle-slice" class="util-btn">
+              <span>✂️</span> <span data-i18n="sliceToggle">הפעל חיתוך</span>
+            </button>
+            <div id="slice-slider-container" class="slice-slider-box hidden">
+              <div class="slice-axes-btns">
+                <button class="axis-btn active" data-axis="z">רוחב Z</button>
+                <button class="axis-btn" data-axis="x">אורך X</button>
+                <button class="axis-btn" data-axis="y">גובה Y</button>
+              </div>
+              <input type="range" id="slider-slice" min="-200" max="200" value="50" class="range-slider">
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom 3D Model File Import (Z-Anatomy GLTF/GLB) -->
+        <div class="toolbar-section">
+          <div class="toolbar-title" data-i18n="importModel">טעינת מודל חיצוני</div>
+          <label class="util-btn import-btn" for="input-custom-model">
+            <span>📥</span> <span data-i18n="importBtn">טען GLB / GLTF</span>
+            <input type="file" id="input-custom-model" accept=".glb,.gltf" style="display:none;">
+          </label>
+        </div>
+
+        <!-- Transparency Slider -->
+        <div class="toolbar-section">
+          <div class="toolbar-slider-label">
+            <span data-i18n="bodyOpacity">שקיפות גוף</span>
+            <span id="opacity-val">18%</span>
+          </div>
+          <input type="range" id="slider-opacity" min="0" max="100" value="18" class="range-slider">
+        </div>
+      </aside>
+
+      <!-- 3D Canvas Viewport -->
+      <div id="viewport-container" class="viewport-container">
+        <!-- Authentic 3D Model Quick Switcher -->
+        <div class="specimen-quick-bar">
+          <button class="specimen-pill active" data-specimen="solid_cow">
+            <span>🐄</span> <span data-i18n="specimenSolidCow">פרה חיה (עור מלא)</span>
+          </button>
+          <button class="specimen-pill" data-specimen="muscles">
+            <span>🥩</span> <span data-i18n="specimenMuscles">שרירים ובשר (Meat)</span>
+          </button>
+          <button class="specimen-pill" data-specimen="blender_cow">
+            <span>✨</span> <span data-i18n="specimenBlender">אנטומיה פנימית (רנטגן X-Ray)</span>
+          </button>
+          <button class="specimen-pill" data-specimen="skeleton">
+            <span>💀</span> <span data-i18n="specimenSkeleton">שלד וי"ג צלעות</span>
+          </button>
+          <button class="specimen-pill" data-specimen="digestive">
+            <span>🥣</span> <span data-i18n="specimenDigestive">4 הקיבות והמעיים</span>
+          </button>
+          <button class="specimen-pill" data-specimen="vessels">
+            <span>🩸</span> <span data-i18n="specimenVessels">מערכת כלי הדם</span>
+          </button>
+          <button class="specimen-pill" data-specimen="shechita">
+            <span>🔪</span> <span data-i18n="specimenShechita">מקום השחיטה (קנה וושט)</span>
+          </button>
+        </div>
+
+        <!-- Primary Authentic 3D Specimen Viewport (Z-Anatomy & Veterinary Scans) -->
+        <div id="specimen-primary-container" class="specimen-primary-container hidden">
+          <iframe id="primary-specimen-iframe"
+            title="Bovine Anatomy Model - UoN Vet School"
+            src=""
+            allow="autoplay; fullscreen; xr-spatial-tracking"
+            frameborder="0">
+          </iframe>
+        </div>
+
+        <canvas id="webgl-canvas"></canvas>
+
+        <!-- Model Loading Overlay -->
+        <div id="model-loading-overlay" class="model-loading-overlay">
+          <div class="model-spinner"></div>
+          <div class="loading-title">טוען מודל בקר אנטומי מלא...</div>
+          <div class="loading-subtitle">Authentic 3D Bovine Anatomy</div>
+        </div>
+
+        <!-- Floating Hint / Instructions -->
+        <div class="viewport-hint">
+          <span class="hint-icon">💡</span>
+          <span data-i18n="viewportHint">גרור לסיבוב 360° • גלגל לזום • בחר איבר לצפייה בהלכות חולין ויו"ד</span>
+        </div>
+
+        <!-- Quick 3D Label Overlay -->
+        <div id="organ-hover-badge" class="organ-hover-badge hidden"></div>
+      </div>
+
+      <!-- Right Detail & Study Drawer -->
+      <aside id="detail-drawer" class="detail-drawer">
+
+        <!-- 1. EXPLORE MODE PANEL -->
+        <div id="panel-explore" class="drawer-panel active">
+          <div class="drawer-header">
+            <h2 id="organ-title" class="drawer-title">בחר איבר לצפייה</h2>
+            <span id="organ-system-tag" class="system-badge">כללי</span>
+          </div>
+          <div class="drawer-body">
+            <div id="organ-empty-prompt" class="empty-state">
+              <div class="empty-icon">🐄</div>
+              <p data-i18n="selectOrganPrompt">לחץ על כל איבר במודל התלת-ממדי (ריאות, 4 קיבות, קנה, ושט, מוח, צלעות) או בחר מתוך י"ח הטרפות.</p>
+            </div>
+
+            <div id="organ-content" class="organ-details-content hidden">
+              <div class="info-card">
+                <div class="card-subtitle" data-i18n="talmudTerm">מונח תלמודי</div>
+                <div id="organ-talmud-term" class="talmud-quote"></div>
+              </div>
+
+              <div class="info-card">
+                <div class="card-subtitle" data-i18n="halachicRule">עיקרי ההלכה (שולחן ערוך)</div>
+                <p id="organ-halacha-text" class="card-text"></p>
+              </div>
+
+              <!-- Related Treifot List for this organ -->
+              <div class="info-card">
+                <div class="card-subtitle" data-i18n="relatedTreifot">טרפות רלוונטיות לאיבר זה</div>
+                <div id="organ-related-treifot" class="treifot-chip-list"></div>
+              </div>
+
+              <!-- Quick Focus Action -->
+              <button id="btn-focus-organ" class="btn-primary-action">
+                <span>🎯</span> <span data-i18n="focusOrgan">התמקד באיבר זה</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. HILCHOT SHECHITA PANEL (Chullin 12a - 18b) -->
+        <div id="panel-shechita" class="drawer-panel">
+          <div class="drawer-header">
+            <h2 class="drawer-title" data-i18n="shechitaTitle">הלכות שחיטה (חולין י"ב-י"ח)</h2>
+            <span class="system-badge">קנה ווושט</span>
+          </div>
+          <div class="drawer-body">
+            <!-- 2 Simanim Section -->
+            <div class="info-card">
+              <div class="card-subtitle">שני הסימנים וגבולות הצוואר</div>
+              <div class="simanim-switch">
+                <button id="btn-siman-kaneh" class="siman-btn active">
+                  <span>🫁</span> <span>קנה (Trachea)</span>
+                </button>
+                <button id="btn-siman-veshet" class="siman-btn">
+                  <span>🥩</span> <span>ושט (Esophagus)</span>
+                </button>
+              </div>
+              <div id="siman-detail-card" class="siman-detail-box">
+                <div id="siman-name" class="talmud-quote"></div>
+                <div class="siman-rule-row">
+                  <strong>דין שחיטה:</strong> <span id="siman-req"></span>
+                </div>
+                <div class="siman-rule-row">
+                  <strong>גבולות כשרים:</strong> <span id="siman-boundaries"></span>
+                </div>
+                <div class="siman-source-row">
+                  <span id="siman-talmud" class="source-tag"></span>
+                  <span id="siman-sa" class="source-tag sa"></span>
+                </div>
+              </div>
+              <button id="btn-focus-shechita-zone" class="btn-primary-action" style="margin-top:8px;">
+                <span>🎯</span> <span>התמקד באזור השחיטה בצוואר</span>
+              </button>
+            </div>
+
+            <!-- Chamesh Halachot Pesulot -->
+            <div class="info-card">
+              <div class="card-subtitle">חמש הלכות שחיטה (הפסולים)</div>
+              <div id="chamesh-halachot-list" class="chamesh-list"></div>
+            </div>
+
+            <!-- Knife Inspection Simulator (Chullin 17b) -->
+            <div class="info-card">
+              <div class="card-subtitle">בדיקת הסכין (חולין י"ז ע"ב - י"ח ע"א)</div>
+              <p class="card-text" style="font-size:0.8rem;color:var(--text-secondary);">
+                בדיקה בי"ב רוחות וכיוונים: על גבי בשר (כנגד הוושט) ועל גבי ציפורן (כנגד הקנה), בחוד ובב' צדדי הלהב בהולכה והובאה.
+              </p>
+              <div class="knife-tester-box">
+                <div class="knife-blade-graphic">
+                  <div class="blade-spine">גב הסכין</div>
+                  <div class="blade-body">
+                    <span id="knife-indicator" class="knife-indicator">סכין חלקה וכשרה ✓</span>
+                  </div>
+                  <div class="blade-edge">חוד הסכין (הלהב)</div>
+                </div>
+                <div class="knife-test-actions">
+                  <button id="btn-test-knife-kosher" class="util-btn">
+                    <span>✨</span> <span>בדוק סכין חלקה</span>
+                  </button>
+                  <button id="btn-test-knife-pegimah" class="util-btn" style="border-color:var(--accent-rose);">
+                    <span>⚠️</span> <span>הדגם פגימה זעירה</span>
+                  </button>
+                </div>
+                <div id="knife-test-result" class="knife-result-box hidden"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 18 TREIFOT PANEL -->
+        <div id="panel-treifot" class="drawer-panel">
+          <div class="drawer-header">
+            <h2 class="drawer-title" data-i18n="treifotCatalogTitle">י"ח טרפות (חולין מ"ב ע"א)</h2>
+            <div class="search-box">
+              <input type="text" id="treifot-search" placeholder="חיפוש טרפה או איבר..." data-i18n-placeholder="searchTreifot">
+            </div>
+          </div>
+          <div class="drawer-body">
+            <div id="treifot-list" class="treifot-list"></div>
+
+            <!-- Active Treifah Inspector -->
+            <div id="treifah-inspector-card" class="treifah-inspector-card hidden">
+              <div class="inspector-header">
+                <div id="inspector-treifah-title" class="inspector-title"></div>
+                <button id="btn-close-inspector" class="btn-close">&times;</button>
+              </div>
+              <div class="inspector-body">
+                <div class="source-tag" id="inspector-source"></div>
+                <div class="source-tag sa" id="inspector-sa"></div>
+                <p id="inspector-summary" class="inspector-text"></p>
+
+                <!-- Interactive Defect State Toggle -->
+                <div class="defect-state-toggle-box">
+                  <div class="toggle-label" data-i18n="visualizeStatus">המחשה תלת-ממדית:</div>
+                  <div class="state-buttons">
+                    <button id="btn-state-kosher" class="state-btn kosher">
+                      <span>✓</span> <span data-i18n="stateKosher">כשרה</span>
+                    </button>
+                    <button id="btn-state-treifah" class="state-btn treifah active">
+                      <span>✕</span> <span data-i18n="stateTreifah">טרפה (הצג מום)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. BEDIKAH SIMULATOR PANEL -->
+        <div id="panel-bedikah" class="drawer-panel">
+          <div class="drawer-header">
+            <h2 class="drawer-title" data-i18n="bedikahSimTitle">סימולטור בדיקת כשרות</h2>
+            <span class="quiz-score-badge"><span id="quiz-correct-count">0</span> / <span id="quiz-total-count">0</span></span>
+          </div>
+          <div class="drawer-body">
+            <div class="quiz-container">
+              <div class="quiz-question-card">
+                <div class="quiz-question-number" id="quiz-question-number">תרחיש 1</div>
+                <div class="quiz-question-text" id="quiz-question-text">טוען תרחיש בדיקה...</div>
+              </div>
+
+              <div id="quiz-options-container" class="quiz-options"></div>
+
+              <div id="quiz-feedback-box" class="quiz-feedback-box hidden">
+                <div id="quiz-feedback-header" class="feedback-header"></div>
+                <div id="quiz-feedback-explanation" class="feedback-text"></div>
+                <button id="btn-next-question" class="btn-primary-action" data-i18n="nextScenario">תרחיש הבא ❯</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. REAL SPECIMENS PANEL (Z-Anatomy & Univ. of Zurich Scans) -->
+        <div id="panel-specimens" class="drawer-panel">
+          <div class="drawer-header">
+            <h2 class="drawer-title" data-i18n="specimensTitle">סריקות אנטומיות אותנטיות</h2>
+            <span class="source-credit">Z-Anatomy & Vet Anatomy</span>
+          </div>
+          <div class="drawer-body">
+            <p class="specimens-intro" data-i18n="specimensIntro">סריקות תלת-ממדיות אמיתיות מאוסף Z-Anatomy Bovide ומוזיאוני האנטומיה הווטרינרית בציריך ואונטריו:</p>
+            <div id="specimens-grid" class="specimens-grid"></div>
+          </div>
+        </div>
+
+      </aside>
+    </main>
+
+    <!-- Modal for 3D Specimen Sketchfab Inspection -->
+    <div id="specimen-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="modal-specimen-title" class="modal-title">דגם תלת-ממדי</h3>
+          <button id="btn-close-modal" class="btn-close">&times;</button>
+        </div>
+        <div class="modal-content">
+          <div id="modal-iframe-container" class="iframe-container"></div>
+          <p id="modal-specimen-desc" class="modal-desc"></p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

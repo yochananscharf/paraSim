@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Production build output
+dist/
+
+# Scratch scripts, debug traces & logs
+scratch/
+*.log
+
+# Large source assets (>50MB / >100MB exceed GitHub's upload limits)
+# Note: The application uses the optimized glb at public/models/cow/cow_anatomy.glb (45MB)
+public/models/cow/OBJ/
+public/models/cow/FBX/
+public/models/cow/3DMAX/
+public/models/cow/caow_anatomy.glb
+public/models/NAV-Viewer4/
+
+# OS / Editor temporary files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
