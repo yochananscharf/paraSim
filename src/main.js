@@ -210,6 +210,15 @@ const importedModelGroup = new THREE.Group();
 importedModelGroup.name = 'imported_3d_models';
 scene.add(importedModelGroup);
 
+// Dedicated Group for the high-definition Bovine Musculature 3D model (Meshy AI Image-to-3D)
+const muscleModelGroup = new THREE.Group();
+muscleModelGroup.name = 'muscle_anatomy_model';
+muscleModelGroup.visible = false;
+scene.add(muscleModelGroup);
+
+let isMuscleModelLoading = false;
+let isMuscleModelLoaded = false;
+
 // Texture loader & cache for the converted Blender model
 const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map();
@@ -498,37 +507,39 @@ function setSkinMode(mode) {
       ['muscles', 'skeletal', 'vessels', 'digestive', 'vital'].forEach(sys => {
         if (importedSystems[sys]) importedSystems[sys].forEach(m => m.visible = false);
       });
+      if (muscleModelGroup) muscleModelGroup.visible = false;
       // Clear defect visualizer in solid mode
       treifahVisualizer.clear();
     } else if (mode === 'muscle') {
-      // Full anatomical muscular cow (Meat / בשר הבהמה, matching the reference render)
-      // Hide outer skin envelope so 3D muscles and skeleton are exposed!
+      // Full anatomical muscular cow (Meat / בשר הבהמה - HD Meshy 3D Model)
+      // Hide outer skin envelope
       importedSystems.silhouette.forEach(mesh => {
         mesh.visible = false;
       });
-      // Show all 124 3D sculpted muscles & tendons
-      if (importedSystems.muscles) {
-        importedSystems.muscles.forEach(m => m.visible = true);
-      }
-      // Show skeleton (172 bones) providing the anatomical foundation exactly as seen in reference photo
-      if (importedSystems.skeletal) {
-        importedSystems.skeletal.forEach(m => m.visible = true);
-      }
-      // Show blood vessels (jugular veins & carotid arteries)
-      if (importedSystems.vessels) {
-        importedSystems.vessels.forEach(m => m.visible = true);
-      }
-      // Hide internal visceral and digestive organs so musculoskeletal structure is clean and uncluttered
-      ['digestive', 'vital'].forEach(sys => {
+      // Hide internal visceral and digestive organs so musculature is clean and uncluttered
+      ['muscles', 'skeletal', 'vessels', 'respiratory', 'shechita', 'digestive', 'vital'].forEach(sys => {
         if (importedSystems[sys]) importedSystems[sys].forEach(m => m.visible = false);
       });
+      if (shechitaVisualizer) shechitaVisualizer.setVisible(false);
+
+      // Load & display the high-definition 3D muscle anatomy model
+      loadMuscleModel((group) => {
+        if (state.skinMode === 'muscle') {
+          group.visible = true;
+        }
+      });
+      if (isMuscleModelLoaded && muscleModelGroup) {
+        muscleModelGroup.visible = true;
+      }
+
       // Synchronize system toggles in toolbar
       document.querySelectorAll('.sys-btn').forEach(btn => {
         const sys = btn.dataset.system;
-        btn.classList.toggle('active', sys === 'muscles' || sys === 'skeletal');
+        btn.classList.toggle('active', sys === 'muscles');
       });
       treifahVisualizer.clear();
     } else if (mode === 'xray') {
+      if (muscleModelGroup) muscleModelGroup.visible = false;
       importedSystems.silhouette.forEach(mesh => {
         mesh.visible = true;
         mesh.material = importedMaterials.skinXray;
@@ -541,6 +552,7 @@ function setSkinMode(mode) {
         if (importedSystems[sys]) importedSystems[sys].forEach(m => m.visible = true);
       });
     } else if (mode === 'none') {
+      if (muscleModelGroup) muscleModelGroup.visible = false;
       importedSystems.silhouette.forEach(mesh => {
         mesh.visible = false;
       });
@@ -621,9 +633,10 @@ function focusShechitaZone(simanKey = state.selectedSimanId) {
 
   cameraController.moveTo(neckPos, neckTarget, 0.8);
 
-  // Show Shechita halachic boundaries visualization
+  // Show Shechita halachic boundaries visualization ONLY when in Shechita mode / tab
+  const isShechitaView = state.activeMode === 'shechita' || state.activeSpecimen === 'shechita';
   if (shechitaVisualizer) {
-    shechitaVisualizer.setVisible(state.isShechitaZoneActive);
+    shechitaVisualizer.setVisible(isShechitaView && (state.isShechitaZoneActive ?? true));
   }
 
   // Highlight selected siman
@@ -632,6 +645,11 @@ function focusShechitaZone(simanKey = state.selectedSimanId) {
 
 function switchPrimarySpecimen(specimenKey) {
   state.activeSpecimen = specimenKey;
+
+  // Ensure Shechita boundary markers are hidden in all other specimen modes
+  if (specimenKey !== 'shechita' && shechitaVisualizer) {
+    shechitaVisualizer.setVisible(false);
+  }
 
   // Update pill buttons active state
   document.querySelectorAll('.specimen-pill').forEach((pill) => {
@@ -1492,6 +1510,89 @@ function loadModelFromUrl(url) {
 }
 
 // -------------------------------------------------------------
+// LOAD HIGH-DEFINITION BOVINE MUSCLE MODEL (Meshy AI Image-to-3D)
+// -------------------------------------------------------------
+function loadMuscleModel(onComplete) {
+  if (isMuscleModelLoaded) {
+    if (onComplete) onComplete(muscleModelGroup);
+    return;
+  }
+  if (isMuscleModelLoading) return;
+  isMuscleModelLoading = true;
+
+  if (hoverBadge) {
+    hoverBadge.classList.remove('hidden');
+    hoverBadge.textContent = state.lang === 'he' ? 'טוען מודל שרירי הבקר התלת-ממדי (HD)...' : 'Loading HD Bovine Muscle Model...';
+  }
+
+  const loader = new GLTFLoader();
+  loader.load('/models/cow/bovine_muscles.glb', (gltf) => {
+    const model = gltf.scene;
+
+    // Compute bounding box and normalize
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 2.30 / (maxDim || 1);
+    model.scale.set(scale, scale, scale);
+
+    const center = box.getCenter(new THREE.Vector3());
+    model.position.sub(center.multiplyScalar(scale));
+
+    // Rotate +90 deg around Y so the head (+Z) aligns with the cow (+X)
+    model.rotation.y = Math.PI / 2;
+
+    // Ground hooves nicely at same height as main cow
+    model.position.y += 0.82;
+    model.updateMatrixWorld(true);
+
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        child.userData.isOrgan = true;
+        child.userData.organId = 'muscles';
+        child.userData.system = 'muscles';
+        child.userData.labelHe = 'שרירי הבקר ובשר הבהמה (Muscles & Meat)';
+        child.userData.labelEn = 'Bovine Skeletal Musculature & Meat';
+
+        if (child.material) {
+          child.material.clippingPlanes = [clippingPlane];
+          child.material.side = THREE.DoubleSide;
+        }
+      }
+    });
+
+    while (muscleModelGroup.children.length > 0) {
+      muscleModelGroup.remove(muscleModelGroup.children[0]);
+    }
+    muscleModelGroup.add(model);
+    isMuscleModelLoaded = true;
+    isMuscleModelLoading = false;
+
+    if (hoverBadge) {
+      hoverBadge.textContent = state.lang === 'he' ? '✓ מודל השרירים נטען בהצלחה!' : '✓ Muscle Model Loaded!';
+      setTimeout(() => hoverBadge.classList.add('hidden'), 2500);
+    }
+
+    if (onComplete) onComplete(muscleModelGroup);
+  }, (xhr) => {
+    if (xhr.lengthComputable && hoverBadge) {
+      const pct = Math.round((xhr.loaded / xhr.total) * 100);
+      hoverBadge.classList.remove('hidden');
+      hoverBadge.textContent = state.lang === 'he' ? `טוען מודל שרירים... ${pct}%` : `Loading Muscle Model... ${pct}%`;
+    }
+  }, (err) => {
+    console.error('Error loading muscle GLB:', err);
+    isMuscleModelLoading = false;
+    if (hoverBadge) {
+      hoverBadge.textContent = state.lang === 'he' ? 'שגיאה בטעינת מודל השרירים' : 'Error loading muscle model';
+      setTimeout(() => hoverBadge.classList.add('hidden'), 3000);
+    }
+  });
+}
+
+// -------------------------------------------------------------
 // ORGAN SELECTION & INTERACTION
 // -------------------------------------------------------------
 function selectOrgan(organId) {
@@ -1500,6 +1601,11 @@ function selectOrgan(organId) {
 
   state.selectedOrganId = organId;
   sound.playSelect();
+
+  // Hide Shechita boundary overlay if exploring general organs
+  if (state.activeMode !== 'shechita' && state.activeSpecimen !== 'shechita' && shechitaVisualizer) {
+    shechitaVisualizer.setVisible(false);
+  }
 
   // If solid skin is obstructing, switch to translucent X-Ray so organ is visible inside
   if (organId !== 'muscles' && state.activeSpecimen !== 'muscles' && state.skinMode === 'solid') {
@@ -2060,6 +2166,13 @@ function onCanvasMouseMove(event) {
       }
     });
   }
+  if (muscleModelGroup && muscleModelGroup.visible) {
+    muscleModelGroup.traverse(mesh => {
+      if (mesh.isMesh && mesh.visible) {
+        interactiveObjects.push(mesh);
+      }
+    });
+  }
 
   const intersects = raycaster.intersectObjects(interactiveObjects, true);
 
@@ -2224,6 +2337,10 @@ function animate() {
   if (shechitaVisualizer && shechitaVisualizer.group) {
     shechitaVisualizer.group.rotation.y = importedModelGroup.rotation.y;
   }
+  // Keep muscle model synced with cow model rotation
+  if (muscleModelGroup) {
+    muscleModelGroup.rotation.y = importedModelGroup.rotation.y;
+  }
 
   cameraController.update(delta);
   treifahVisualizer.update(time);
@@ -2244,6 +2361,8 @@ window.__simcowleh = {
   importedSystems,
   importedMaterials,
   importedModelGroup,
+  muscleModelGroup,
+  loadMuscleModel,
   state,
   switchPrimarySpecimen,
   setSkinMode

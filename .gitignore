@@ -12,8 +12,9 @@ scratch/
 # Note: The application uses the optimized glb at public/models/cow/cow_anatomy.glb (45MB)
 public/models/cow/OBJ/
 public/models/cow/FBX/
-public/models/cow/3DMAX/
 public/models/cow/caow_anatomy.glb
+public/models/cow/*Muscle*.glb
+public/models/cow/bovine_muscles.glb
 public/models/NAV-Viewer4/
 
 # OS / Editor temporary files
