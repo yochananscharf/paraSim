@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createBovineAnatomyScene } from './scene/cowModel.js';
 import { CameraController } from './utils/cameraController.js';
 import { TreifahVisualizer } from './scene/treifahVisualizer.js';
+import { ShechitaZoneVisualizer } from './scene/shechitaVisualizer.js';
 import { sound } from './utils/audio.js';
 import { ORGANS, ORGAN_SYSTEMS } from './data/organData.js';
 import { TREIFOT_18 } from './data/treifotData.js';
@@ -15,8 +16,11 @@ const state = {
   lang: 'he', // 'he' | 'en'
   activeMode: 'explore', // 'explore' | 'shechita' | 'treifot' | 'bedikah' | 'specimens'
   activeSpecimen: 'solid_cow', // 'solid_cow' | 'blender_cow' | 'skeleton' | 'digestive' | 'vessels' | 'shechita' | 'uon_anatomy'
+  skinMode: 'solid', // 'solid' | 'muscle' | 'xray' | 'none'
   selectedOrganId: null,
   selectedSimanId: 'kaneh',
+  isShechitaZoneActive: true,
+  isShechitaLabelsActive: true,
   activeTreifahId: null,
   isTreifahDefectActive: true,
   autoRotate: false,
@@ -407,7 +411,15 @@ const importedMaterials = {
     clipShadows: true
   }),
   muscle: createMuscleShaderMaterial(clippingPlane),
-  tendon: createTendonShaderMaterial(clippingPlane)
+  tendon: createTendonShaderMaterial(clippingPlane),
+  esophagus: new THREE.MeshStandardMaterial({
+    color: 0xc24128,
+    roughness: 0.38,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+    clippingPlanes: [clippingPlane],
+    clipShadows: true
+  })
 };
 
 // Anatomical systems tracking for imported Blender model
@@ -431,6 +443,7 @@ const sketchfabController = new SketchfabController('primary-specimen-iframe');
 // Controls & Visualizers
 const cameraController = new CameraController(camera, canvas);
 const treifahVisualizer = new TreifahVisualizer(scene, organMeshes);
+const shechitaVisualizer = new ShechitaZoneVisualizer(scene);
 
 // Raycasting
 const raycaster = new THREE.Raycaster();
@@ -442,6 +455,7 @@ let hoveredOrgan = null;
 // COW SKIN APPEARANCE MODES
 // -------------------------------------------------------------
 function setSkinMode(mode) {
+  state.skinMode = mode;
   const btnSkinSolid = document.getElementById('btn-skin-solid');
   const btnSkinMuscle = document.getElementById('btn-skin-muscle');
   const btnSkinXray = document.getElementById('btn-skin-xray');
@@ -590,18 +604,27 @@ function focusShechitaZone(simanKey = state.selectedSimanId) {
   if (importedSystems.shechita) importedSystems.shechita.forEach(m => m.visible = true);
   if (importedSystems.digestive) importedSystems.digestive.forEach(m => m.visible = true);
   if (importedSystems.vessels) importedSystems.vessels.forEach(m => m.visible = true);
+  // Hide neck muscles in shechita mode so the two simanim (kaneh & veshet) are clearly visible
+  if (importedSystems.muscles) importedSystems.muscles.forEach(m => m.visible = false);
+
   document.querySelector('.sys-btn[data-system="respiratory"]')?.classList.add('active');
   document.querySelector('.sys-btn[data-system="digestive"]')?.classList.add('active');
+  document.querySelector('.sys-btn[data-system="muscles"]')?.classList.remove('active');
 
-  // In bovine anatomy, the esophagus (ושט) lies on the LEFT side of the trachea in the neck
+  // In bovine anatomy, the trachea (קנה) is ventral and the esophagus (ושט) runs on the LEFT side (-Z)
   // Position camera on the left (-Z) side when viewing Veshet, and right (+Z) side for Kaneh
   const isVeshet = simanKey === 'veshet';
-  const neckTarget = new THREE.Vector3(-0.58, 1.20, isVeshet ? -0.03 : 0.04);
+  const neckTarget = new THREE.Vector3(0.58, 1.09, isVeshet ? -0.035 : 0.01);
   const neckPos = isVeshet
-    ? new THREE.Vector3(-0.90, 1.22, -0.75)
-    : new THREE.Vector3(-0.90, 1.22, 0.75);
+    ? new THREE.Vector3(0.92, 1.22, -0.65)
+    : new THREE.Vector3(0.92, 1.22, 0.65);
 
   cameraController.moveTo(neckPos, neckTarget, 0.8);
+
+  // Show Shechita halachic boundaries visualization
+  if (shechitaVisualizer) {
+    shechitaVisualizer.setVisible(state.isShechitaZoneActive);
+  }
 
   // Highlight selected siman
   highlightOrganMesh(simanKey || 'kaneh');
@@ -668,7 +691,7 @@ function switchPrimarySpecimen(specimenKey) {
       if (k !== 'allMeshes' && k !== 'vessels' && k !== 'silhouette') importedSystems[k].forEach(m => m.visible = false);
     });
     if (importedSystems.vessels) importedSystems.vessels.forEach(m => m.visible = true);
-    selectOrgan('kaneh');
+    selectOrgan('carotidArtery');
   } else if (specimenKey === 'shechita') {
     setMode('shechita');
     focusShechitaZone();
@@ -741,10 +764,10 @@ function initUI() {
       sound.playClick();
       const sysName = btn.dataset.system;
       const grp = groups[sysName];
-      let isVis = false;
+      let finalVis = false;
       if (grp) {
         grp.visible = !grp.visible;
-        isVis = grp.visible;
+        finalVis = grp.visible;
         btn.classList.toggle('active', grp.visible);
       }
       // Also toggle imported Blender model meshes!
@@ -753,9 +776,10 @@ function initUI() {
         const nextVis = !anyVis;
         importedSystems[sysName].forEach(m => m.visible = nextVis);
         btn.classList.toggle('active', nextVis);
+        finalVis = nextVis; // Use imported system's state for Sketchfab API
       }
       // Control real 3D model system layers directly via Sketchfab API
-      sketchfabController.setSystemVisibility(sysName, isVis);
+      sketchfabController.setSystemVisibility(sysName, finalVis);
     });
   });
 
@@ -945,7 +969,7 @@ function initUI() {
       selectOrgan('keres');
     } else if (name.includes('reticul')) {
       setMode('explore');
-      selectOrgan('beitHakosot');
+      selectOrgan('beitHakosos');
     } else if (name.includes('omasum')) {
       setMode('explore');
       selectOrgan('hameses');
@@ -987,16 +1011,20 @@ function setMode(mode) {
 
   if (mode === 'shechita') {
     renderShechitaPanel();
-  } else if (mode === 'treifot') {
-    if (!state.activeTreifahId) {
-      selectTreifah(1);
-    } else {
-      selectTreifah(state.activeTreifahId);
+    focusShechitaZone(state.selectedSimanId || 'kaneh');
+  } else {
+    if (shechitaVisualizer) shechitaVisualizer.setVisible(false);
+    if (mode === 'treifot') {
+      if (!state.activeTreifahId) {
+        selectTreifah(1);
+      } else {
+        selectTreifah(state.activeTreifahId);
+      }
+    } else if (mode === 'bedikah') {
+      renderQuizQuestion();
+    } else if (mode === 'specimens') {
+      renderSpecimensList();
     }
-  } else if (mode === 'bedikah') {
-    renderQuizQuestion();
-  } else if (mode === 'specimens') {
-    renderSpecimensList();
   }
 }
 
@@ -1085,7 +1113,6 @@ function loadCustomModelFile(file) {
 
 function loadModelFromUrl(url) {
   const loader = new GLTFLoader();
-  const hoverBadge = document.getElementById('organ-hover-badge');
   if (hoverBadge) {
     hoverBadge.classList.remove('hidden');
     hoverBadge.textContent = state.lang === 'he' ? 'טוען מודל תלת-ממד של הפרה מ-Blender...' : 'Loading Blender 3D Cow Model...';
@@ -1114,6 +1141,19 @@ function loadModelFromUrl(url) {
     // Reset importedSystems
     Object.keys(importedSystems).forEach(k => importedSystems[k].length = 0);
 
+    // Compute bounding box and normalize scale & position FIRST so mesh world boxes are accurate
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 2.4 / (maxDim || 1);
+    model.scale.set(scale, scale, scale);
+
+    const center = box.getCenter(new THREE.Vector3());
+    model.position.sub(center.multiplyScalar(scale));
+    // Ground the hooves nicely above the grid plane
+    model.position.y += 0.8;
+    model.updateMatrixWorld(true);
+
     model.traverse((child) => {
       if (child.isMesh) {
         meshCount++;
@@ -1123,6 +1163,8 @@ function loadModelFromUrl(url) {
 
         const origMatName = child.material?.name || '';
         const nodeName = child.name || '';
+        const b = new THREE.Box3().setFromObject(child);
+        const ctr = b.getCenter(new THREE.Vector3());
 
         // Check if mesh is cow skin / body
         const isSkin = origMatName === '20023' || origMatName === '20024' ||
@@ -1134,43 +1176,47 @@ function loadModelFromUrl(url) {
         if (isSkin) {
           child.material = importedMaterials.skinSolid;
           child.userData.system = 'silhouette';
+          child.userData.organId = 'solidCow';
           child.userData.labelHe = 'גוף הפרה (עור הולשטיין)';
           child.userData.labelEn = 'Cow Body (Holstein Skin)';
           importedSystems.silhouette.push(child);
+        } else if (origMatName === '20021') {
+          // Venous vascular network
+          child.material = importedMaterials.vein.clone();
+          child.userData.system = 'vessels';
+          child.userData.organId = 'jugularVein';
+          child.userData.labelHe = 'וריד הצוואר ומחזור הוורידים (Jugular Vein)';
+          child.userData.labelEn = 'Jugular Veins & Venous System';
+          importedSystems.vessels.push(child);
+        } else if (origMatName === '20022') {
+          // Arterial vascular network
+          child.material = importedMaterials.artery.clone();
+          child.userData.system = 'vessels';
+          child.userData.organId = 'carotidArtery';
+          child.userData.labelHe = 'עורק התרדמה ועורקי הצוואר (Carotid Artery)';
+          child.userData.labelEn = 'Carotid Arteries & Arterial System';
+          importedSystems.vessels.push(child);
         } else if (origMatName === '20020') {
           // Skeleton (172 bone meshes)
           child.material = importedMaterials.bone.clone();
           child.userData.system = 'skeletal';
 
-          // Differentiate specific bone anatomy (Ribs vs Spine vs Skull vs Limbs)
-          const geom = child.geometry;
-          geom.computeBoundingBox();
-          const bb = geom.boundingBox;
-          const cx = bb ? (bb.min.x + bb.max.x) / 2 : 0;
-          const cy = bb ? (bb.min.y + bb.max.y) / 2 : 0;
-          const dy = bb ? bb.max.y - bb.min.y : 0;
-
-          const isSkull = cx > 310;
-          const isSpine = (cy > 85 && dy <= 45) || (cx > 120 && cx <= 310 && cy > 80);
-          const isRib = dy > 35 && cx > -180 && cx <= 120;
-          const isLimb = cy < 50;
-
-          if (isSkull) {
+          if (ctr.x > 0.75 && ctr.y > 0.9) {
             child.userData.organId = 'moach';
             child.userData.labelHe = 'גולגולת ומוח (Bovine Skull)';
             child.userData.labelEn = 'Bovine Skull & Brain';
-          } else if (isSpine) {
+          } else if (ctr.y > 1.25 && ctr.x < 0.75 && ctr.x > -0.9) {
             child.userData.organId = 'chutHashidrah';
             child.userData.labelHe = 'עמוד השדרה וחוט השדרה (Spine & Spinal Cord)';
             child.userData.labelEn = 'Spine & Spinal Cord';
-          } else if (isRib) {
+          } else if (ctr.x > -0.35 && ctr.x < 0.45 && ctr.y > 0.7 && Math.abs(ctr.z) > 0.08) {
             child.userData.organId = 'tzlaot';
             child.userData.labelHe = 'צלעות (י"ג צלעות)';
             child.userData.labelEn = 'Ribs (13 Pairs of Ribs)';
-          } else if (isLimb) {
+          } else if (ctr.x < -0.5 && ctr.y < 1.0) {
             child.userData.organId = 'bokaDatma';
-            child.userData.labelHe = 'עצמות הגפיים (ירך ואגן)';
-            child.userData.labelEn = 'Limb Bones & Femur';
+            child.userData.labelHe = 'עצמות הירך והאגן (בוקא דאטמא)';
+            child.userData.labelEn = 'Pelvis & Femur (Boka D\'Atma)';
           } else {
             child.userData.organId = 'tzlaot';
             child.userData.labelHe = 'עצמות השלד';
@@ -1178,23 +1224,39 @@ function loadModelFromUrl(url) {
           }
           importedSystems.skeletal.push(child);
         } else if (origMatName === '20018') {
-          // Bovine Tendons & Fascia (32 meshes: glistening ivory connective tissue)
+          // Tendons & Fascia
           child.material = importedMaterials.tendon.clone();
-          child.userData.system = 'muscles';
-          child.userData.organId = 'muscles';
-          child.userData.labelHe = 'גידים ורצועות (Fascia & Tendons)';
-          child.userData.labelEn = 'Bovine Tendons & Fascia';
-          importedSystems.muscles.push(child);
+          if (ctr.x < -0.6 && ctr.y < 0.6) {
+            child.userData.system = 'limbs';
+            child.userData.organId = 'tzometHagidin';
+            child.userData.labelHe = 'צומת הגידים (Tendon Nexus)';
+            child.userData.labelEn = 'Junction of Tendons (Tzomet HaGidin)';
+            importedSystems.limbs.push(child);
+          } else {
+            child.userData.system = 'muscles';
+            child.userData.organId = 'muscles';
+            child.userData.labelHe = 'גידים ורצועות (Fascia & Tendons)';
+            child.userData.labelEn = 'Bovine Tendons & Fascia';
+            importedSystems.muscles.push(child);
+          }
         } else if (origMatName === '20019') {
-          // Bovine Muscle Bellies (92 meshes: rich striated beef meat)
+          // Muscle Bellies
           child.material = importedMaterials.muscle.clone();
-          child.userData.system = 'muscles';
-          child.userData.organId = 'muscles';
-          child.userData.labelHe = 'שרירי הבקר (בשר הבהמה)';
-          child.userData.labelEn = 'Bovine Musculature (Meat)';
-          importedSystems.muscles.push(child);
-        } else if (nodeName === '20006' || nodeName.includes('20006')) {
-          // Trachea / Windpipe (קנה הנשימה - גרגרת)
+          if (ctr.x < -0.6 && ctr.y < 0.5 && Math.abs(ctr.z) > 0.15) {
+            child.userData.system = 'limbs';
+            child.userData.organId = 'tzometHagidin';
+            child.userData.labelHe = 'שרירי השוק וצומת הגידים';
+            child.userData.labelEn = 'Hindlimb Musculature';
+            importedSystems.limbs.push(child);
+          } else {
+            child.userData.system = 'muscles';
+            child.userData.organId = 'muscles';
+            child.userData.labelHe = 'שרירי הבקר (בשר הבהמה)';
+            child.userData.labelEn = 'Bovine Musculature (Meat)';
+            importedSystems.muscles.push(child);
+          }
+        } else if (nodeName === '20033' || nodeName === '20050' || (ctr.x > 0.25 && ctr.x < 0.9 && ctr.y > 1.0 && ctr.y < 1.25 && Math.abs(ctr.z) < 0.08 && origMatName === '20005')) {
+          // Trachea / Windpipe & Esophagus (Anterior neck tube)
           child.material = new THREE.MeshStandardMaterial({
             color: 0xebdcd0,
             roughness: 0.38,
@@ -1208,40 +1270,129 @@ function loadModelFromUrl(url) {
           child.userData.labelEn = 'Trachea (Windpipe)';
           importedSystems.respiratory.push(child);
           if (importedSystems.shechita) importedSystems.shechita.push(child);
-        } else if (nodeName === '20007' || nodeName.includes('20007')) {
-          // Esophagus / Gullet (הוושט - תורבץ הוושט ובית הבליעה)
+        } else if (origMatName === '20016' || nodeName === '20065') {
+          // Heart
           child.material = new THREE.MeshStandardMaterial({
-            color: 0xb4533c,
-            roughness: 0.42,
+            color: 0xb91c1c,
+            roughness: 0.35,
+            metalness: 0.1,
+            side: THREE.DoubleSide,
+            clippingPlanes: [clippingPlane]
+          });
+          child.userData.system = 'vital';
+          child.userData.organId = 'lev';
+          child.userData.labelHe = 'לב (בית חללו - Heart)';
+          child.userData.labelEn = 'Heart (Lev)';
+          importedSystems.vital.push(child);
+        } else if (origMatName === '20015' || origMatName === '20006' || nodeName === '20049' || nodeName === '20012') {
+          // Lungs & Lobes
+          const tex = getCowTexture('20015');
+          child.material = new THREE.MeshStandardMaterial({
+            map: tex,
+            roughness: 0.5,
+            metalness: 0.05,
+            side: THREE.DoubleSide,
+            clippingPlanes: [clippingPlane]
+          });
+          child.userData.system = 'respiratory';
+          child.userData.organId = 'reah';
+          child.userData.labelHe = 'ריאה (אונות, אומות וורדא)';
+          child.userData.labelEn = 'Lungs (Re\'ah & Lobes)';
+          importedSystems.respiratory.push(child);
+        } else if (origMatName === '20007' || nodeName === '20016') {
+          // Liver
+          const tex = getCowTexture('20007');
+          child.material = new THREE.MeshStandardMaterial({
+            map: tex,
+            roughness: 0.5,
+            metalness: 0.05,
+            side: THREE.DoubleSide,
+            clippingPlanes: [clippingPlane]
+          });
+          child.userData.system = 'vital';
+          child.userData.organId = 'kaved';
+          child.userData.labelHe = 'כבד (Kaved)';
+          child.userData.labelEn = 'Liver (Kaved)';
+          importedSystems.vital.push(child);
+        } else if (origMatName === '20001' || nodeName === '20001') {
+          // Gallbladder
+          child.material = new THREE.MeshStandardMaterial({
+            color: 0x10b981,
+            roughness: 0.3,
+            metalness: 0.05,
+            side: THREE.DoubleSide,
+            clippingPlanes: [clippingPlane]
+          });
+          child.userData.system = 'vital';
+          child.userData.organId = 'marah';
+          child.userData.labelHe = 'מרה (כיס המרה - Gallbladder)';
+          child.userData.labelEn = 'Gallbladder (Marah)';
+          importedSystems.vital.push(child);
+        } else if (origMatName === '20011' || nodeName === '20026') {
+          // Spleen
+          child.material = new THREE.MeshStandardMaterial({
+            color: 0x6b21a8,
+            roughness: 0.5,
+            side: THREE.DoubleSide,
+            clippingPlanes: [clippingPlane]
+          });
+          child.userData.system = 'vital';
+          child.userData.organId = 'tchol';
+          child.userData.labelHe = 'טחול (עוביו ודוקו - Spleen)';
+          child.userData.labelEn = 'Spleen (Tchol)';
+          importedSystems.vital.push(child);
+        } else if (origMatName === '20009' || nodeName === '20021' || nodeName === '20022') {
+          // Kidneys
+          child.material = new THREE.MeshStandardMaterial({
+            color: 0x991b1b,
+            roughness: 0.45,
+            side: THREE.DoubleSide,
+            clippingPlanes: [clippingPlane]
+          });
+          child.userData.system = 'vital';
+          child.userData.organId = 'klayot';
+          child.userData.labelHe = 'כליות (Kidneys)';
+          child.userData.labelEn = 'Kidneys (Klayot)';
+          importedSystems.vital.push(child);
+        } else if (origMatName === '20008' || nodeName === '20019' || nodeName === '20020') {
+          // Rumen (Keres)
+          const tex = getCowTexture('20008');
+          child.material = new THREE.MeshStandardMaterial({
+            map: tex,
+            roughness: 0.55,
             metalness: 0.05,
             side: THREE.DoubleSide,
             clippingPlanes: [clippingPlane]
           });
           child.userData.system = 'digestive';
-          child.userData.organId = 'veshet';
-          child.userData.labelHe = 'ושט (תורבץ הוושט - Esophagus)';
-          child.userData.labelEn = 'Esophagus (Gullet)';
+          child.userData.organId = 'keres';
+          child.userData.labelHe = 'כרס (הכרס הפנימית - Rumen)';
+          child.userData.labelEn = 'Rumen (Keres / Paunch)';
           importedSystems.digestive.push(child);
-          importedSystems.respiratory.push(child);
-          if (importedSystems.shechita) importedSystems.shechita.push(child);
-        } else if (origMatName === '20021') {
-          // Jugular vein / venous system (ורידי הצוואר)
-          child.material = importedMaterials.vein.clone();
-          child.userData.system = 'vessels';
-          child.userData.organId = 'jugularVein';
-          child.userData.labelHe = 'וריד הצוואר (Jugular Vein - ורידין שצוואר)';
-          child.userData.labelEn = 'Jugular Veins';
-          importedSystems.vessels.push(child);
-        } else if (origMatName === '20022') {
-          // Carotid artery / arterial system (עורק התרדמה ועורקי הצוואר)
-          child.material = importedMaterials.artery.clone();
-          child.userData.system = 'vessels';
-          child.userData.organId = 'carotidArtery';
-          child.userData.labelHe = 'עורק התרדמה (Carotid Artery - עורקי הצוואר)';
-          child.userData.labelEn = 'Carotid Arteries';
-          importedSystems.vessels.push(child);
-        } else if (['20002', '20003', '20004', '20005', '20010'].includes(origMatName)) {
-          // Digestive system (rumen, reticulum, omasum, abomasum, intestines)
+        } else if (origMatName === '20003') {
+          // Reticulum & Omasum
+          const tex = getCowTexture('20003');
+          child.material = new THREE.MeshStandardMaterial({
+            map: tex,
+            roughness: 0.55,
+            metalness: 0.05,
+            side: THREE.DoubleSide,
+            clippingPlanes: [clippingPlane]
+          });
+          child.userData.system = 'digestive';
+          child.userData.organId = 'beitHakosos';
+          child.userData.labelHe = 'בית הכוסות והמסס (Reticulum & Omasum)';
+          child.userData.labelEn = 'Reticulum & Omasum';
+          importedSystems.digestive.push(child);
+        } else if (ctr.x > 0.8 && ctr.y > 1.0) {
+          // Head / Brain
+          child.userData.system = 'nervous';
+          child.userData.organId = 'moach';
+          child.userData.labelHe = 'מוח וקרום המוח (Brain)';
+          child.userData.labelEn = 'Brain & Meninges (Mo\'ach)';
+          importedSystems.nervous.push(child);
+        } else if (['20002', '20004', '20005', '20010'].includes(origMatName)) {
+          // Intestines & Viscera
           const tex = getCowTexture(origMatName);
           child.material = new THREE.MeshStandardMaterial({
             map: tex,
@@ -1251,24 +1402,15 @@ function loadModelFromUrl(url) {
             clippingPlanes: [clippingPlane]
           });
           child.userData.system = 'digestive';
-          child.userData.organId = 'keres';
-          child.userData.labelHe = 'כרס ו-4 הקיבות והמעיים';
-          child.userData.labelEn = '4 Stomachs & Digestive Tract';
+          child.userData.organId = 'dakin';
+          child.userData.labelHe = 'מעיים ודקין (Intestines)';
+          child.userData.labelEn = 'Intestines (Dakin)';
           importedSystems.digestive.push(child);
         } else {
-          // Vital organs (lungs, heart, liver, spleen, kidneys)
-          const num = origMatName.startsWith('200') ? origMatName : '20014';
-          const tex = getCowTexture(num);
-          child.material = new THREE.MeshStandardMaterial({
-            map: tex,
-            roughness: 0.5,
-            metalness: 0.05,
-            side: THREE.DoubleSide,
-            clippingPlanes: [clippingPlane]
-          });
+          // Vital organs fallback
           child.userData.system = 'vital';
           child.userData.organId = 'reah';
-          child.userData.labelHe = 'איברים פנימיים (ריאה, לב, כבד)';
+          child.userData.labelHe = 'איברים פנימיים';
           child.userData.labelEn = 'Internal Visceral Organs';
           importedSystems.vital.push(child);
         }
@@ -1282,20 +1424,40 @@ function loadModelFromUrl(url) {
         importedModelGroup.remove(importedModelGroup.children[0]);
       }
 
-      // Compute bounding box and normalize scale & position
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const scale = 2.4 / (maxDim || 1);
-      model.scale.set(scale, scale, scale);
-
-      const center = box.getCenter(new THREE.Vector3());
-      model.position.sub(center.multiplyScalar(scale));
-      // Ground the hooves nicely above the grid plane
-      model.position.y += 0.8;
-
       importedModelGroup.add(model);
       root.visible = false; // Hide procedural placeholder cow
+
+      // -----------------------------------------------------------------
+      // Bovine Esophagus (הוושט - הסימן השני לשחיטה)
+      // Anatomically positioned along the dorsal neck and shifts to the LEFT (-Z)
+      // of the trachea (קנה) into the rumen (כרס). Essential for Hilchot Shechita.
+      // -----------------------------------------------------------------
+      const veshetCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0.82, 1.155, 0.000),  // Pharynx / Larynx / תורבץ הוושט
+        new THREE.Vector3(0.70, 1.135, -0.016), // Upper cervical neck
+        new THREE.Vector3(0.58, 1.085, -0.032), // Middle neck (Shechita incision zone - נוטה לשמאל)
+        new THREE.Vector3(0.44, 1.035, -0.045), // Lower neck / Thoracic inlet
+        new THREE.Vector3(0.25, 1.045, -0.055), // Mediastinum (Thorax)
+        new THREE.Vector3(0.00, 1.040, -0.065), // Cardia / Junction with Rumen (כרס)
+        new THREE.Vector3(-0.15, 1.000, -0.075) // Entering Rumen cavity
+      ]);
+
+      const veshetGeo = new THREE.TubeGeometry(veshetCurve, 40, 0.024, 16, false);
+      const veshetMesh = new THREE.Mesh(veshetGeo, importedMaterials.esophagus.clone());
+      veshetMesh.name = 'bovine_veshet_esophagus';
+      veshetMesh.castShadow = true;
+      veshetMesh.receiveShadow = true;
+      veshetMesh.userData.isOrgan = true;
+      veshetMesh.userData.organId = 'veshet';
+      veshetMesh.userData.system = 'digestive';
+      veshetMesh.userData.labelHe = 'ושט (תורבץ הוושט ובית הבליעה - Esophagus)';
+      veshetMesh.userData.labelEn = 'Esophagus (Gullet)';
+
+      importedModelGroup.add(veshetMesh);
+      importedSystems.digestive.push(veshetMesh);
+      importedSystems.respiratory.push(veshetMesh);
+      if (importedSystems.shechita) importedSystems.shechita.push(veshetMesh);
+      importedSystems.allMeshes.push(veshetMesh);
 
       // Apply initial appearance mode (solid lifelike cow by default)
       setSkinMode(state.activeSpecimen === 'solid_cow' ? 'solid' : 'xray');
@@ -1324,13 +1486,8 @@ function loadModelFromUrl(url) {
   }, undefined, (err) => {
     console.warn('Could not auto-load GLB model from url:', err);
     const loadingOverlay = document.getElementById('model-loading-overlay');
-    if (url.includes('cow_anatomy.glb')) {
-      console.log('Attempting fallback to caow_anatomy.glb...');
-      loadModelFromUrl('/models/cow/caow_anatomy.glb');
-    } else {
-      if (loadingOverlay) loadingOverlay.classList.add('hidden');
-      if (hoverBadge) hoverBadge.classList.add('hidden');
-    }
+    if (loadingOverlay) loadingOverlay.classList.add('hidden');
+    if (hoverBadge) hoverBadge.classList.add('hidden');
   });
 }
 
@@ -1345,7 +1502,7 @@ function selectOrgan(organId) {
   sound.playSelect();
 
   // If solid skin is obstructing, switch to translucent X-Ray so organ is visible inside
-  if (organId !== 'muscles' && state.activeSpecimen !== 'muscles' && groups.silhouette && groups.silhouette.userData?.solidGroup?.visible) {
+  if (organId !== 'muscles' && state.activeSpecimen !== 'muscles' && state.skinMode === 'solid') {
     setSkinMode('xray');
   }
 
@@ -1356,7 +1513,7 @@ function selectOrgan(organId) {
   document.getElementById('organ-title').textContent = state.lang === 'he' ? organ.he : organ.en;
   const sysMeta = ORGAN_SYSTEMS[organ.system.toUpperCase()] || { he: organ.system, en: organ.system };
   document.getElementById('organ-system-tag').textContent = state.lang === 'he' ? sysMeta.he : sysMeta.en;
-  document.getElementById('organ-talmud-term').textContent = organ.talmudTerm;
+  document.getElementById('organ-talmud-term').textContent = organ.talmudicTerm;
   document.getElementById('organ-halacha-text').textContent = state.lang === 'he' ? organ.halachicSummaryHe : organ.halachicSummaryEn;
 
   // Related Treifot
@@ -1426,8 +1583,8 @@ function highlightOrganMesh(organId) {
             mesh.userData.savedEmissive = mesh.material.emissive.clone();
             mesh.userData.savedEmissiveIntensity = mesh.material.emissiveIntensity || 0;
           }
-          mesh.material.emissive.set(0x38bdf8);
-          mesh.material.emissiveIntensity = 0.8;
+          mesh.material.emissive.set(organId === 'veshet' ? 0xf59e0b : 0x38bdf8);
+          mesh.material.emissiveIntensity = 0.9;
         } else if (mesh.userData.savedEmissive) {
           mesh.material.emissive.copy(mesh.userData.savedEmissive);
           mesh.material.emissiveIntensity = mesh.userData.savedEmissiveIntensity;
@@ -1478,6 +1635,52 @@ function renderShechitaPanel() {
       sound.playClick();
       activateWebGLMode();
       focusShechitaZone();
+    };
+  }
+
+  // Toggle Shechita Zone Boundaries
+  const toggleZoneBtn = document.getElementById('btn-toggle-shechita-zone');
+  const toggleZoneText = document.getElementById('toggle-zone-text');
+  if (toggleZoneBtn) {
+    toggleZoneBtn.classList.toggle('active', state.isShechitaZoneActive);
+    if (toggleZoneText) {
+      toggleZoneText.textContent = state.isShechitaZoneActive
+        ? (state.lang === 'he' ? 'סימון תחומי שחיטה: פעיל ✓' : 'Boundary Guides: Active ✓')
+        : (state.lang === 'he' ? 'סימון תחומי שחיטה: כבוי' : 'Boundary Guides: Hidden');
+    }
+    toggleZoneBtn.onclick = () => {
+      sound.playClick();
+      state.isShechitaZoneActive = !state.isShechitaZoneActive;
+      if (shechitaVisualizer) shechitaVisualizer.setVisible(state.isShechitaZoneActive);
+      toggleZoneBtn.classList.toggle('active', state.isShechitaZoneActive);
+      if (toggleZoneText) {
+        toggleZoneText.textContent = state.isShechitaZoneActive
+          ? (state.lang === 'he' ? 'סימון תחומי שחיטה: פעיל ✓' : 'Boundary Guides: Active ✓')
+          : (state.lang === 'he' ? 'סימון תחומי שחיטה: כבוי' : 'Boundary Guides: Hidden');
+      }
+    };
+  }
+
+  // Toggle Shechita 3D Labels
+  const toggleLabelsBtn = document.getElementById('btn-toggle-shechita-labels');
+  const toggleLabelsText = document.getElementById('toggle-labels-text');
+  if (toggleLabelsBtn) {
+    toggleLabelsBtn.classList.toggle('active', state.isShechitaLabelsActive);
+    if (toggleLabelsText) {
+      toggleLabelsText.textContent = state.isShechitaLabelsActive
+        ? (state.lang === 'he' ? 'תגיות הסבר: מוצגות' : 'Labels: Shown')
+        : (state.lang === 'he' ? 'תגיות הסבר: מוסתרות' : 'Labels: Hidden');
+    }
+    toggleLabelsBtn.onclick = () => {
+      sound.playClick();
+      state.isShechitaLabelsActive = !state.isShechitaLabelsActive;
+      if (shechitaVisualizer) shechitaVisualizer.setLabelsVisible(state.isShechitaLabelsActive);
+      toggleLabelsBtn.classList.toggle('active', state.isShechitaLabelsActive);
+      if (toggleLabelsText) {
+        toggleLabelsText.textContent = state.isShechitaLabelsActive
+          ? (state.lang === 'he' ? 'תגיות הסבר: מוצגות' : 'Labels: Shown')
+          : (state.lang === 'he' ? 'תגיות הסבר: מוסתרות' : 'Labels: Hidden');
+      }
     };
   }
 
@@ -1832,27 +2035,45 @@ function onCanvasMouseMove(event) {
 
   raycaster.setFromCamera(mouse, camera);
 
+  // Context-aware object filtering: only allow objects relevant to the current view
+  const isSolidSkinMode = state.skinMode === 'solid';
+  const isAnatomyOrDefectView = state.activeMode === 'treifot' || state.activeMode === 'bedikah' || state.activeMode === 'shechita';
+
   const interactiveObjects = [];
   if (root && root.visible) {
     organMeshes.forEach(mesh => {
-      if (mesh.visible) interactiveObjects.push(mesh);
+      if (mesh.visible) {
+        const isSil = mesh.userData?.system === 'silhouette';
+        if (isSolidSkinMode && !isSil) return; // In solid skin view, hide internal organ hovers
+        if (isAnatomyOrDefectView && isSil) return; // In anatomy/treifot view, never hover outer skin
+        interactiveObjects.push(mesh);
+      }
     });
   }
   if (importedSystems.allMeshes && importedSystems.allMeshes.length > 0) {
     importedSystems.allMeshes.forEach(mesh => {
-      if (mesh.visible) interactiveObjects.push(mesh);
+      if (mesh.visible) {
+        const isSil = mesh.userData?.system === 'silhouette';
+        if (isSolidSkinMode && !isSil) return; // In solid cow view, only the cow body/skin is interactive
+        if (isAnatomyOrDefectView && isSil) return; // In anatomy/18 treifot view, never hover body/skin
+        interactiveObjects.push(mesh);
+      }
     });
   }
 
   const intersects = raycaster.intersectObjects(interactiveObjects, true);
 
   if (intersects.length > 0) {
-    // If skin is visible in translucent X-Ray mode, skip skin mesh so user can hover & click internal organs!
+    // If not in solid skin mode, prioritize internal organs over translucent skin
+    const hasNonSilhouette = intersects.some(
+      ix => ix.object.userData?.system !== 'silhouette'
+    );
+
     let hit = null;
     for (let i = 0; i < intersects.length; i++) {
       const obj = intersects[i].object;
-      if (obj.userData?.system === 'silhouette' && obj.material === importedMaterials.skinXray && intersects.length > i + 1) {
-        continue; // skip transparent X-Ray skin
+      if (obj.userData?.system === 'silhouette' && hasNonSilhouette) {
+        continue;
       }
       hit = obj;
       break;
@@ -1864,6 +2085,13 @@ function onCanvasMouseMove(event) {
       topMesh = topMesh.parent;
     }
 
+    // In anatomy, treifot, shechita, or internal view: ignore any hit that is silhouette
+    if (topMesh.userData?.system === 'silhouette' && (isAnatomyOrDefectView || state.skinMode === 'xray' || state.skinMode === 'muscle' || state.skinMode === 'none')) {
+      hoveredOrgan = null;
+      hoverBadge.classList.add('hidden');
+      return;
+    }
+
     if (topMesh.userData?.isOrgan) {
       const organ = ORGANS[topMesh.userData.organId];
       hoveredOrgan = organ || {
@@ -1873,8 +2101,29 @@ function onCanvasMouseMove(event) {
       };
       hoverBadge.classList.remove('hidden');
       hoverBadge.textContent = state.lang === 'he' ? hoveredOrgan.he : hoveredOrgan.en;
-      hoverBadge.style.left = `${event.clientX}px`;
-      hoverBadge.style.top = `${event.clientY - 25}px`;
+
+      // Smart badge positioning: dynamically place in free space
+      const canvasRect = canvas.getBoundingClientRect();
+      const badgeW = hoverBadge.offsetWidth || 180;
+      const badgeH = hoverBadge.offsetHeight || 36;
+      const pad = 16;
+      const mouseX = event.clientX - canvasRect.left;
+      const mouseY = event.clientY - canvasRect.top;
+
+      // Dynamic free-space placement:
+      // If cursor is on the right half of the canvas, free space is to the left.
+      // If cursor is on the left half of the canvas, free space is to the right.
+      let bx = mouseX > canvasRect.width * 0.45 ? (mouseX - badgeW - pad) : (mouseX + pad);
+
+      // Vertical placement: if cursor is near top quick-bar, show below cursor; otherwise above
+      let by = mouseY < 120 ? (mouseY + pad + 10) : (mouseY - badgeH - pad);
+
+      // Clamp within canvas boundaries
+      bx = Math.max(pad, Math.min(bx, canvasRect.width - badgeW - pad));
+      by = Math.max(pad, Math.min(by, canvasRect.height - badgeH - pad));
+
+      hoverBadge.style.left = `${bx}px`;
+      hoverBadge.style.top = `${by}px`;
       return;
     }
   }
@@ -1945,6 +2194,7 @@ function applyLanguage() {
     state.lang === 'he' ? 'EN' : 'עב';
 
   // Re-render localized dynamic components
+  if (shechitaVisualizer) shechitaVisualizer.setLanguage(state.lang);
   renderShechitaPanel();
   renderTreifotList();
   renderSpecimensList();
@@ -1970,8 +2220,14 @@ function animate() {
     importedModelGroup.rotation.y += delta * 0.3;
   }
 
+  // Keep shechita visualizer synced with cow model rotation
+  if (shechitaVisualizer && shechitaVisualizer.group) {
+    shechitaVisualizer.group.rotation.y = importedModelGroup.rotation.y;
+  }
+
   cameraController.update(delta);
   treifahVisualizer.update(time);
+  if (shechitaVisualizer) shechitaVisualizer.update(time);
 
   renderer.render(scene, camera);
 }

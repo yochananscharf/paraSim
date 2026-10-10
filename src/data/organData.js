@@ -19,7 +19,7 @@ export const ORGANS = {
     talmudicTerm: 'ושט (תורבץ הוושט)',
     halachicSummaryEn: 'Composed of two layers (outer muscular red layer, inner white mucous layer). A puncture through both layers renders the animal Treifah. Even the tiniest perforation invalidates.',
     halachicSummaryHe: 'מורכב משני עורות: חיצוני אדום ופנימי לבן. ניקב זה בלא זה כשר, ניקבו שניהם טרפה אפילו בנקב כלשהו. (שולחן ערוך יו"ד סימן ל"ג)',
-    position: [-0.58, 1.21, -0.03]
+    position: [0.58, 1.09, -0.035]
   },
   kaneh: {
     id: 'kaneh',
@@ -29,7 +29,7 @@ export const ORGANS = {
     talmudicTerm: 'קנה / גרגרת',
     halachicSummaryEn: 'The windpipe composed of cartilage rings. If severed across majority (rov) or perforated to the size of an issar coin, it is Treifah.',
     halachicSummaryHe: 'פסוקת הגרגרת ברובה טרפה. בניקוב שיעורו כאיסר. (שולחן ערוך יו"ד סימן ל"ד)',
-    position: [-0.52, 1.21, 0.04]
+    position: [0.58, 1.09, 0.01]
   },
   reah: {
     id: 'reah',

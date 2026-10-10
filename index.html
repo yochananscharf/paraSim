@@ -335,6 +335,43 @@
               <button id="btn-focus-shechita-zone" class="btn-primary-action" style="margin-top:8px;">
                 <span>🎯</span> <span>התמקד באזור השחיטה בצוואר</span>
               </button>
+
+              <!-- Shechita Zone Visual Guides & Legend -->
+              <div class="shechita-zone-controls" style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; gap:8px;">
+                  <button id="btn-toggle-shechita-zone" class="util-btn active" style="flex:1; justify-content:center; border-color:var(--accent-emerald);">
+                    <span>📏</span> <span id="toggle-zone-text">סימון תחומי שחיטה: פעיל ✓</span>
+                  </button>
+                  <button id="btn-toggle-shechita-labels" class="util-btn active" style="flex:1; justify-content:center; border-color:var(--accent-cyan);">
+                    <span>🏷️</span> <span id="toggle-labels-text">תגיות הסבר: מוצגות</span>
+                  </button>
+                </div>
+
+                <!-- Halachic Boundaries Legend -->
+                <div class="shechita-legend-box" style="background:rgba(15, 23, 42, 0.6); border:1px solid rgba(56, 189, 248, 0.2); border-radius:8px; padding:10px; font-size:0.78rem; line-height:1.45;">
+                  <div style="font-weight:700; color:var(--accent-cyan); margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                    <span>📐</span> <span>מקרא תחומי השחיטה (שו"ע יו"ד סי' כ'-כ"ד):</span>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:4px; color:var(--text-secondary);">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#38bdf8; box-shadow:0 0 6px #38bdf8; flex-shrink:0;"></span>
+                      <span><strong>טבעת עליונה (תכלת):</strong> גבול עליון – מתחת לשיפוי כובע ותורבץ הוושט (למעלה מזה פסול הגרמה).</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#fbbf24; box-shadow:0 0 6px #fbbf24; flex-shrink:0;"></span>
+                      <span><strong>טבעת זהב מרכזית:</strong> אמצע הצוואר – מקום שחיטה מובחר לכתחילה (רוב שני הסימנים).</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#38bdf8; box-shadow:0 0 6px #38bdf8; flex-shrink:0;"></span>
+                      <span><strong>טבעת תחתונה (תכלת):</strong> גבול תחתון – סמוך לבית החזה וכנפי הריאה (למטה מזה פסול הגרמה).</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span style="display:inline-block; width:12px; height:12px; border-radius:4px; background:rgba(16, 185, 129, 0.3); border:1px solid #10b981; flex-shrink:0;"></span>
+                      <span><strong>מעטפת שקופה (ירוקה):</strong> תחום השחיטה הכשר – חצי שקוף לשמירה על נראות מלאה של הקנה והוושט.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Chamesh Halachot Pesulot -->
