@@ -267,29 +267,104 @@ button, input {
 }
 
 /* Authentic 3D Model Quick Switcher Bar */
-.specimen-quick-bar {
+/* Authentic 3D Model Quick Switcher Ribbon */
+.specimen-quick-bar-wrapper {
   position: absolute;
   top: 14px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(16px);
-  padding: 6px 10px;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  gap: 8px;
+  max-width: min(1300px, calc(100% - 24px));
   z-index: 35;
-  max-width: 90%;
+  pointer-events: none;
+}
+
+.specimen-quick-bar-wrapper > * {
+  pointer-events: auto;
+}
+
+.specimen-quick-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(20px);
+  padding: 6px 12px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
   overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  max-width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.5) rgba(15, 23, 42, 0.4);
+}
+
+.specimen-quick-bar:active {
+  cursor: grabbing;
 }
 
 .specimen-quick-bar::-webkit-scrollbar {
-  display: none;
+  height: 4px;
+}
+
+.specimen-quick-bar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 999px;
+  margin: 0 12px;
+}
+
+.specimen-quick-bar::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.7), rgba(239, 68, 68, 0.7));
+  border-radius: 999px;
+}
+
+.specimen-quick-bar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(90deg, rgba(56, 189, 248, 1), rgba(239, 68, 68, 1));
+}
+
+.quickbar-nav-btn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.quickbar-nav-btn:hover {
+  background: rgba(30, 41, 59, 0.98);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.55);
+  transform: scale(1.08);
+}
+
+.quickbar-nav-btn:active {
+  transform: scale(0.95);
+}
+
+.quickbar-nav-btn.disabled,
+.quickbar-nav-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+  pointer-events: none;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .specimen-pill {
@@ -1534,3 +1609,363 @@ html[dir="ltr"] .treifah-item-btn:hover {
 .shechita-legend-box strong {
   color: #f1f5f9;
 }
+
+/* ==========================================================================
+   Supermarket & Butcher Beef Cuts Guide (1-19) - Premium Glassmorphic UI
+   ========================================================================== */
+
+/* Quick bar pill highlight */
+.specimen-pill.beef-cuts-pill {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.12));
+}
+
+.specimen-pill.beef-cuts-pill:hover,
+.specimen-pill.beef-cuts-pill.active {
+  border-color: #ef4444;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.35);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(245, 158, 11, 0.22));
+}
+
+.pill-fire-badge {
+  display: inline-block;
+  animation: pulseFire 1.8s infinite ease-in-out;
+}
+
+@keyframes pulseFire {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px #ef4444); }
+  50% { transform: scale(1.22); filter: drop-shadow(0 0 8px #f59e0b); }
+}
+
+/* Floating Interactive Banner in Muscle View */
+.muscle-beef-cuts-banner {
+  position: absolute;
+  top: 68px;
+  right: 20px;
+  z-index: 25;
+  animation: slideDownFade 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDownFade {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.beef-cuts-interactive-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  border-radius: var(--radius-xl);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 18px rgba(239, 68, 68, 0.2);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  color: #f8fafc;
+  text-align: right;
+}
+
+.beef-cuts-interactive-btn:hover {
+  transform: translateY(-2px);
+  border-color: #ef4444;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), 0 0 24px rgba(239, 68, 68, 0.35);
+  background: rgba(26, 15, 30, 0.92);
+}
+
+.beef-cuts-interactive-btn.active {
+  border-color: #f59e0b;
+  box-shadow: 0 0 24px rgba(245, 158, 11, 0.4);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(245, 158, 11, 0.2));
+}
+
+.beef-cuts-btn-icon {
+  font-size: 1.6rem;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(239, 68, 68, 0.2);
+  border-radius: 50%;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  flex-shrink: 0;
+}
+
+.beef-cuts-btn-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.beef-cuts-btn-title {
+  font-weight: 700;
+  font-size: 0.96rem;
+  color: #f8fafc;
+}
+
+.beef-cuts-btn-sub {
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.beef-cuts-btn-action {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.15);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.beef-cuts-interactive-btn:hover .beef-cuts-btn-action {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+}
+
+/* Beef Cuts Filters & Search */
+.beef-cuts-filters-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.beef-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-pill {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.filter-pill:hover {
+  background: rgba(51, 65, 85, 0.8);
+  color: var(--text-primary);
+}
+
+.filter-pill.active {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #fca5a5;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+}
+
+/* Beef Cut Spotlight Card */
+.beef-cut-spotlight-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.75), rgba(15, 23, 42, 0.85));
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  animation: fadeIn 0.25s ease;
+}
+
+.spotlight-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.spotlight-num-badge {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ef4444, #f59e0b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #0f172a;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.4);
+  flex-shrink: 0;
+}
+
+.spotlight-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.spotlight-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.spotlight-aliases {
+  font-size: 0.82rem;
+  color: #f59e0b;
+}
+
+.spotlight-en {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  font-family: 'Inter', sans-serif;
+}
+
+.spotlight-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cut-section-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+}
+
+.cut-section-tag.hindquarter {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #f59e0b;
+}
+
+.cut-fat-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+.spotlight-desc-box {
+  background: rgba(15, 23, 42, 0.5);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+}
+
+/* Cooking Chips */
+.cooking-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.cooking-chip {
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+/* Beef Cuts Grid */
+.beef-cuts-catalog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.beef-cuts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding-bottom: 24px;
+}
+
+.beef-cut-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: right;
+}
+
+.beef-cut-tile:hover {
+  background: rgba(51, 65, 85, 0.7);
+  border-color: rgba(239, 68, 68, 0.4);
+  transform: translateY(-1px);
+}
+
+.beef-cut-tile.active {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+}
+
+.tile-number-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.25);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.82rem;
+  color: #fca5a5;
+  flex-shrink: 0;
+}
+
+.beef-cut-tile.active .tile-number-badge {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.tile-texts {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tile-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tile-sub {
+  font-size: 0.70rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+

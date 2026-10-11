@@ -15,6 +15,8 @@ public/models/cow/FBX/
 public/models/cow/caow_anatomy.glb
 public/models/cow/*Muscle*.glb
 public/models/cow/bovine_muscles.glb
+public/models/cow/muscle_manifest.json
+public/models/cow/3DMAX/
 public/models/NAV-Viewer4/
 
 # OS / Editor temporary files

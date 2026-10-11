@@ -207,28 +207,41 @@
 
       <!-- 3D Canvas Viewport -->
       <div id="viewport-container" class="viewport-container">
-        <!-- Authentic 3D Model Quick Switcher -->
-        <div class="specimen-quick-bar">
-          <button class="specimen-pill active" data-specimen="solid_cow">
-            <span>🐄</span> <span data-i18n="specimenSolidCow">פרה חיה (עור מלא)</span>
+        <!-- Authentic 3D Model Quick Switcher Ribbon -->
+        <div class="specimen-quick-bar-wrapper">
+          <button id="btn-quickbar-scroll-right" class="quickbar-nav-btn quickbar-btn-right" title="גלול ימינה (לתחילת הרשימה)" aria-label="Scroll right">
+            <span>❯</span>
           </button>
-          <button class="specimen-pill" data-specimen="muscles">
-            <span>🥩</span> <span data-i18n="specimenMuscles">שרירים ובשר (Meat)</span>
-          </button>
-          <button class="specimen-pill" data-specimen="blender_cow">
-            <span>✨</span> <span data-i18n="specimenBlender">אנטומיה פנימית (רנטגן X-Ray)</span>
-          </button>
-          <button class="specimen-pill" data-specimen="skeleton">
-            <span>💀</span> <span data-i18n="specimenSkeleton">שלד וי"ג צלעות</span>
-          </button>
-          <button class="specimen-pill" data-specimen="digestive">
-            <span>🥣</span> <span data-i18n="specimenDigestive">4 הקיבות והמעיים</span>
-          </button>
-          <button class="specimen-pill" data-specimen="vessels">
-            <span>🩸</span> <span data-i18n="specimenVessels">מערכת כלי הדם</span>
-          </button>
-          <button class="specimen-pill" data-specimen="shechita">
-            <span>🔪</span> <span data-i18n="specimenShechita">מקום השחיטה (קנה וושט)</span>
+          
+          <div id="specimen-quick-bar" class="specimen-quick-bar">
+            <button class="specimen-pill active" data-specimen="solid_cow">
+              <span>🐄</span> <span data-i18n="specimenSolidCow">פרה חיה (עור מלא)</span>
+            </button>
+            <button class="specimen-pill" data-specimen="muscles">
+              <span>🥩</span> <span data-i18n="specimenMuscles">שרירים ובשר (Meat)</span>
+            </button>
+            <button class="specimen-pill beef-cuts-pill" id="btn-specimen-beef-cuts" data-specimen="beef_cuts">
+              <span class="pill-fire-badge">🔥</span> <span data-i18n="specimenBeefCuts">נתחי בשר בסופר (1-19)</span>
+            </button>
+            <button class="specimen-pill" data-specimen="blender_cow">
+              <span>✨</span> <span data-i18n="specimenBlender">אנטומיה פנימית (רנטגן X-Ray)</span>
+            </button>
+            <button class="specimen-pill" data-specimen="skeleton">
+              <span>💀</span> <span data-i18n="specimenSkeleton">שלד וי"ג צלעות</span>
+            </button>
+            <button class="specimen-pill" data-specimen="digestive">
+              <span>🥣</span> <span data-i18n="specimenDigestive">4 הקיבות והמעיים</span>
+            </button>
+            <button class="specimen-pill" data-specimen="vessels">
+              <span>🩸</span> <span data-i18n="specimenVessels">מערכת כלי הדם</span>
+            </button>
+            <button class="specimen-pill" data-specimen="shechita">
+              <span>🔪</span> <span data-i18n="specimenShechita">מקום השחיטה (קנה וושט)</span>
+            </button>
+          </div>
+
+          <button id="btn-quickbar-scroll-left" class="quickbar-nav-btn quickbar-btn-left" title="גלול שמאלה (למקום השחיטה)" aria-label="Scroll left">
+            <span>❮</span>
           </button>
         </div>
 
@@ -240,6 +253,18 @@
             allow="autoplay; fullscreen; xr-spatial-tracking"
             frameborder="0">
           </iframe>
+        </div>
+
+        <!-- Interactive Beef Cuts Floating Banner in Muscle View -->
+        <div id="muscle-beef-cuts-banner" class="muscle-beef-cuts-banner hidden">
+          <button id="btn-toggle-beef-cuts" class="beef-cuts-interactive-btn">
+            <div class="beef-cuts-btn-icon">🥩</div>
+            <div class="beef-cuts-btn-info">
+              <span class="beef-cuts-btn-title">מפת נתחי הבקר בסופר ובקצבייה (1-19)</span>
+              <span class="beef-cuts-btn-sub">אנטריקוט, בריסקט, אסאדו, סינטה, פילה • מדריך קצבים וסו-וויד</span>
+            </div>
+            <span class="beef-cuts-btn-action" id="beef-cuts-btn-status">הפעל מפה ❯</span>
+          </button>
         </div>
 
         <canvas id="webgl-canvas"></canvas>
@@ -480,6 +505,85 @@
           <div class="drawer-body">
             <p class="specimens-intro" data-i18n="specimensIntro">סריקות תלת-ממדיות אמיתיות מאוסף Z-Anatomy Bovide ומוזיאוני האנטומיה הווטרינרית בציריך ואונטריו:</p>
             <div id="specimens-grid" class="specimens-grid"></div>
+          </div>
+        </div>
+
+        <!-- 5. SUPERMARKET BEEF CUTS PANEL (1-19) -->
+        <div id="panel-beef-cuts" class="drawer-panel">
+          <div class="drawer-header">
+            <div class="drawer-header-content">
+              <h2 class="drawer-title">🥩 נתחי הבקר בסופר (1-19)</h2>
+              <span class="system-badge" style="background:rgba(239, 68, 68, 0.2); color:#f87171; border:1px solid rgba(239, 68, 68, 0.4);">מדריך הקצבייה והסו-וויד</span>
+            </div>
+            <button id="btn-close-beef-cuts" class="btn-close" title="סגור מדריך">&times;</button>
+          </div>
+          <div class="drawer-body">
+            <!-- Search & Filters -->
+            <div class="beef-cuts-filters-box">
+              <div class="search-box">
+                <input type="text" id="beef-cuts-search" placeholder="חפש לפי מספר או שם (אנטריקוט, בריסקט, 1...)...">
+              </div>
+              <div class="beef-filter-pills">
+                <button class="filter-pill active" data-filter="all">הכל (18)</button>
+                <button class="filter-pill" data-filter="forequarter">חלק קדמי (ללא ניקור)</button>
+                <button class="filter-pill" data-filter="hindquarter">חלק אחורי (ניקור)</button>
+                <button class="filter-pill" data-filter="grill">גריל / סטייק</button>
+                <button class="filter-pill" data-filter="stew">בישול ארוך / סו-וויד</button>
+              </div>
+            </div>
+
+            <!-- Active Selected Cut Spotlight Card -->
+            <div id="beef-cut-spotlight-card" class="beef-cut-spotlight-card">
+              <div class="spotlight-top">
+                <div class="spotlight-num-badge" id="spotlight-number">1</div>
+                <div class="spotlight-titles">
+                  <h3 class="spotlight-name" id="spotlight-name">אנטריקוט</h3>
+                  <div class="spotlight-aliases" id="spotlight-aliases">ורד הצלע, פריים ריב, סטייק עין, טומהוק</div>
+                  <div class="spotlight-en" id="spotlight-en">Prime Rib, Rib Eye, Tomahawk</div>
+                </div>
+              </div>
+
+              <!-- Badges Row: Kosher Section & Fat Level -->
+              <div class="spotlight-meta-row">
+                <span class="cut-section-tag" id="spotlight-section-tag">חלק קדמי (כשר ללא ניקור)</span>
+                <span class="cut-fat-tag" id="spotlight-fat-tag">רמת שומן: משויש גבוה</span>
+              </div>
+
+              <!-- Characteristics -->
+              <div class="spotlight-desc-box">
+                <p id="spotlight-characteristics"></p>
+              </div>
+
+              <!-- Cooking Methods -->
+              <div class="info-card" style="margin-top:10px;">
+                <div class="card-subtitle">שיטות בישול מומלצות</div>
+                <div id="spotlight-cooking-chips" class="cooking-chips-container"></div>
+              </div>
+
+              <!-- Popular Dishes -->
+              <div class="info-card">
+                <div class="card-subtitle">מנות ושימושים פופולריים</div>
+                <p id="spotlight-dishes" class="card-text"></p>
+              </div>
+
+              <!-- Chef Tips from Sous-Vide guide -->
+              <div class="info-card" style="border-color:rgba(245, 158, 11, 0.3); background:rgba(245, 158, 11, 0.05);">
+                <div class="card-subtitle" style="color:#f59e0b;">💡 טיפ קצבייה וסו-וויד (sousvide.co.il)</div>
+                <p id="spotlight-tips" class="card-text"></p>
+              </div>
+
+              <!-- Focus in 3D Button -->
+              <button id="btn-focus-beef-cut" class="btn-primary-action" style="margin-top:10px;">
+                <span>🎯</span> <span>התמקד בנתח זה במודל התלת-ממדי</span>
+              </button>
+            </div>
+
+            <!-- Quick Cuts Grid / Selector -->
+            <div class="beef-cuts-catalog-header">
+              <span>בחר נתח לצפייה בתלת-ממד:</span>
+              <span id="beef-cuts-count-label">18 נתחים</span>
+            </div>
+            <div id="beef-cuts-grid" class="beef-cuts-grid"></div>
           </div>
         </div>
 

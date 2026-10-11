@@ -10,13 +10,19 @@ import { TREIFOT_18 } from './data/treifotData.js';
 import { ANATOMICAL_SPECIMENS } from './data/specimensData.js';
 import { SHECHITA_SIMANIM, CHAMESH_HALACHOT, BEDIKAT_HASAKIN } from './data/shechitaData.js';
 import { SketchfabController } from './scene/sketchfabController.js';
+import { BEEF_CUTS, SECTION_METADATA } from './data/beefCutsData.js';
+import { BeefCutsVisualizer } from './scene/beefCutsVisualizer.js';
 
 // Application State
 const state = {
   lang: 'he', // 'he' | 'en'
-  activeMode: 'explore', // 'explore' | 'shechita' | 'treifot' | 'bedikah' | 'specimens'
+  activeMode: 'explore', // 'explore' | 'shechita' | 'treifot' | 'bedikah' | 'specimens' | 'beef-cuts'
   activeSpecimen: 'solid_cow', // 'solid_cow' | 'blender_cow' | 'skeleton' | 'digestive' | 'vessels' | 'shechita' | 'uon_anatomy'
   skinMode: 'solid', // 'solid' | 'muscle' | 'xray' | 'none'
+  isBeefCutsActive: false,
+  selectedBeefCutId: 'entrecote',
+  beefCutsFilter: 'all',
+  beefCutsSearch: '',
   selectedOrganId: null,
   selectedSimanId: 'kaneh',
   isShechitaZoneActive: true,
@@ -453,6 +459,9 @@ const sketchfabController = new SketchfabController('primary-specimen-iframe');
 const cameraController = new CameraController(camera, canvas);
 const treifahVisualizer = new TreifahVisualizer(scene, organMeshes);
 const shechitaVisualizer = new ShechitaZoneVisualizer(scene);
+const beefCutsVisualizer = new BeefCutsVisualizer(scene, camera, {
+  onSelectCut: (cut) => selectBeefCut(cut.id)
+});
 
 // Raycasting
 const raycaster = new THREE.Raycaster();
@@ -522,6 +531,10 @@ function setSkinMode(mode) {
       });
       if (shechitaVisualizer) shechitaVisualizer.setVisible(false);
 
+      // Show interactive Supermarket Beef Cuts banner in Muscle View
+      const beefCutsBanner = document.getElementById('muscle-beef-cuts-banner');
+      if (beefCutsBanner) beefCutsBanner.classList.remove('hidden');
+
       // Load & display the high-definition 3D muscle anatomy model
       loadMuscleModel((group) => {
         if (state.skinMode === 'muscle') {
@@ -538,28 +551,38 @@ function setSkinMode(mode) {
         btn.classList.toggle('active', sys === 'muscles');
       });
       treifahVisualizer.clear();
-    } else if (mode === 'xray') {
-      if (muscleModelGroup) muscleModelGroup.visible = false;
-      importedSystems.silhouette.forEach(mesh => {
-        mesh.visible = true;
-        mesh.material = importedMaterials.skinXray;
-        mesh.userData.organId = 'cowXray';
-        mesh.userData.labelHe = 'גוף חיצוני (רנטגן X-Ray)';
-        mesh.userData.labelEn = 'Outer Body (X-Ray)';
-      });
-      // Show internal organs through the translucent X-Ray skin
-      ['muscles', 'skeletal', 'vessels', 'respiratory', 'shechita', 'digestive', 'vital'].forEach(sys => {
-        if (importedSystems[sys]) importedSystems[sys].forEach(m => m.visible = true);
-      });
-    } else if (mode === 'none') {
-      if (muscleModelGroup) muscleModelGroup.visible = false;
-      importedSystems.silhouette.forEach(mesh => {
-        mesh.visible = false;
-      });
-      // Show internal organs only
-      ['muscles', 'skeletal', 'vessels', 'respiratory', 'shechita', 'digestive', 'vital'].forEach(sys => {
-        if (importedSystems[sys]) importedSystems[sys].forEach(m => m.visible = true);
-      });
+    } else {
+      // Hide beef cuts banner & 3D markers when leaving muscle view
+      const beefCutsBanner = document.getElementById('muscle-beef-cuts-banner');
+      if (beefCutsBanner) beefCutsBanner.classList.add('hidden');
+      if (beefCutsVisualizer) beefCutsVisualizer.setVisible(false);
+      state.isBeefCutsActive = false;
+      const bannerBtn = document.getElementById('btn-toggle-beef-cuts');
+      if (bannerBtn) bannerBtn.classList.remove('active');
+
+      if (mode === 'xray') {
+        if (muscleModelGroup) muscleModelGroup.visible = false;
+        importedSystems.silhouette.forEach(mesh => {
+          mesh.visible = true;
+          mesh.material = importedMaterials.skinXray;
+          mesh.userData.organId = 'cowXray';
+          mesh.userData.labelHe = 'גוף חיצוני (רנטגן X-Ray)';
+          mesh.userData.labelEn = 'Outer Body (X-Ray)';
+        });
+        // Show internal organs through the translucent X-Ray skin
+        ['muscles', 'skeletal', 'vessels', 'respiratory', 'shechita', 'digestive', 'vital'].forEach(sys => {
+          if (importedSystems[sys]) importedSystems[sys].forEach(m => m.visible = true);
+        });
+      } else if (mode === 'none') {
+        if (muscleModelGroup) muscleModelGroup.visible = false;
+        importedSystems.silhouette.forEach(mesh => {
+          mesh.visible = false;
+        });
+        // Show internal organs only
+        ['muscles', 'skeletal', 'vessels', 'respiratory', 'shechita', 'digestive', 'vital'].forEach(sys => {
+          if (importedSystems[sys]) importedSystems[sys].forEach(m => m.visible = true);
+        });
+      }
     }
   }
 
@@ -651,10 +674,25 @@ function switchPrimarySpecimen(specimenKey) {
     shechitaVisualizer.setVisible(false);
   }
 
-  // Update pill buttons active state
+  // Update pill buttons active state and ensure visible in ribbon
   document.querySelectorAll('.specimen-pill').forEach((pill) => {
-    pill.classList.toggle('active', pill.dataset.specimen === specimenKey);
+    const isActive = pill.dataset.specimen === specimenKey;
+    pill.classList.toggle('active', isActive);
+    if (isActive) {
+      pill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
   });
+
+  if (specimenKey === 'beef_cuts') {
+    switchPrimarySpecimen('muscles');
+    toggleBeefCutsExperience(true);
+    return;
+  }
+
+  // Deactivate beef cuts 3D visualizer if switching to non-muscle specimen
+  if (specimenKey !== 'beef_cuts' && specimenKey !== 'muscles' && state.isBeefCutsActive) {
+    toggleBeefCutsExperience(false);
+  }
 
   if (specimenKey === 'solid_cow') {
     setMode('explore');
@@ -717,12 +755,127 @@ function switchPrimarySpecimen(specimenKey) {
 }
 
 // -------------------------------------------------------------
+// TOP QUICK SWITCHER RIBBON SCROLL CONTROLS
+// -------------------------------------------------------------
+let isQuickBarDragging = false;
+
+function initQuickBarScrollControls() {
+  const quickBar = document.getElementById('specimen-quick-bar');
+  const btnScrollLeft = document.getElementById('btn-quickbar-scroll-left');
+  const btnScrollRight = document.getElementById('btn-quickbar-scroll-right');
+  const headerNav = document.querySelector('.header-nav');
+  if (!quickBar) return;
+
+  function updateScrollButtons() {
+    const scrollWidth = quickBar.scrollWidth;
+    const clientWidth = quickBar.clientWidth;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 4) {
+      if (btnScrollLeft) btnScrollLeft.classList.add('disabled');
+      if (btnScrollRight) btnScrollRight.classList.add('disabled');
+      return;
+    }
+
+    // In RTL, scrollLeft is 0 at right edge, and negative towards the left
+    const currentScrollAbs = Math.abs(quickBar.scrollLeft);
+    const atRight = currentScrollAbs <= 4;
+    const atLeft = currentScrollAbs >= (maxScroll - 6);
+
+    if (btnScrollRight) btnScrollRight.classList.toggle('disabled', atRight);
+    if (btnScrollLeft) btnScrollLeft.classList.toggle('disabled', atLeft);
+  }
+
+  // 1. Arrow Button Click Handlers
+  if (btnScrollLeft) {
+    btnScrollLeft.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      sound.playClick();
+      // In RTL, negative scrolls left towards מקום השחיטה
+      quickBar.scrollBy({ left: -260, behavior: 'smooth' });
+    });
+  }
+
+  if (btnScrollRight) {
+    btnScrollRight.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      sound.playClick();
+      // In RTL, positive scrolls right towards פרה חיה
+      quickBar.scrollBy({ left: 260, behavior: 'smooth' });
+    });
+  }
+
+  // 2. Mouse Wheel Scroll (scrolling down navigates along the ribbon towards shechita)
+  quickBar.addEventListener('wheel', (e) => {
+    if (Math.abs(e.deltaY) > 0 || Math.abs(e.deltaX) > 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : -e.deltaX;
+      quickBar.scrollBy({
+        left: -delta * 1.5,
+        behavior: 'auto'
+      });
+      updateScrollButtons();
+    }
+  }, { passive: false });
+
+  // Wheel support for header nav tabs if overflowing
+  if (headerNav) {
+    headerNav.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaY) > 0) {
+        e.preventDefault();
+        headerNav.scrollBy({ left: -e.deltaY * 1.5, behavior: 'auto' });
+      }
+    }, { passive: false });
+  }
+
+  // 3. Mouse Grab & Drag-to-Scroll
+  let isDown = false;
+  let startX = 0;
+  let scrollLeftStart = 0;
+
+  quickBar.addEventListener('mousedown', (e) => {
+    isDown = true;
+    isQuickBarDragging = false;
+    startX = e.pageX;
+    scrollLeftStart = quickBar.scrollLeft;
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (isDown) {
+      isDown = false;
+      setTimeout(() => {
+        isQuickBarDragging = false;
+      }, 60);
+    }
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDown) return;
+    const walk = e.pageX - startX;
+    if (Math.abs(walk) > 4) {
+      isQuickBarDragging = true;
+      quickBar.scrollLeft = scrollLeftStart - walk;
+      updateScrollButtons();
+    }
+  });
+
+  quickBar.addEventListener('scroll', updateScrollButtons, { passive: true });
+  window.addEventListener('resize', updateScrollButtons, { passive: true });
+  setTimeout(updateScrollButtons, 300);
+}
+
+// -------------------------------------------------------------
 // EVENT LISTENERS & UI BINDING
 // -------------------------------------------------------------
 function initUI() {
+  initQuickBarScrollControls();
+
   // Specimen Quick Bar Switcher
   document.querySelectorAll('.specimen-pill').forEach((pill) => {
     pill.addEventListener('click', () => {
+      if (isQuickBarDragging) return;
       sound.playClick();
       switchPrimarySpecimen(pill.dataset.specimen);
     });
@@ -958,6 +1111,33 @@ function initUI() {
     if (e.target.id === 'specimen-modal') closeModal();
   });
 
+  // Supermarket Beef Cuts (1-19) Interactive Controls
+  document.getElementById('btn-toggle-beef-cuts')?.addEventListener('click', () => {
+    sound.playClick();
+    toggleBeefCutsExperience();
+  });
+  document.getElementById('btn-close-beef-cuts')?.addEventListener('click', () => {
+    sound.playClick();
+    toggleBeefCutsExperience(false);
+  });
+  document.getElementById('btn-focus-beef-cut')?.addEventListener('click', () => {
+    sound.playClick();
+    selectBeefCut(state.selectedBeefCutId, true);
+  });
+  document.querySelectorAll('.beef-filter-pills .filter-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sound.playClick();
+      document.querySelectorAll('.beef-filter-pills .filter-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.beefCutsFilter = btn.dataset.filter;
+      renderBeefCutsPanel();
+    });
+  });
+  document.getElementById('beef-cuts-search')?.addEventListener('input', (e) => {
+    state.beefCutsSearch = e.target.value;
+    renderBeefCutsPanel();
+  });
+
   // Canvas Mouse Interactions
   canvas.addEventListener('mousemove', onCanvasMouseMove);
   canvas.addEventListener('click', onCanvasClick);
@@ -1042,7 +1222,14 @@ function setMode(mode) {
       renderQuizQuestion();
     } else if (mode === 'specimens') {
       renderSpecimensList();
+    } else if (mode === 'beef-cuts') {
+      renderBeefCutsPanel();
     }
+  }
+
+  // Deactivate beef cuts 3D markers if user explicitly switched to another drawer mode
+  if (mode !== 'beef-cuts' && mode !== 'explore' && state.isBeefCutsActive) {
+    toggleBeefCutsExperience(false);
   }
 }
 
@@ -1511,7 +1698,47 @@ function loadModelFromUrl(url) {
 
 // -------------------------------------------------------------
 // LOAD HIGH-DEFINITION BOVINE MUSCLE MODEL (Meshy AI Image-to-3D)
+// Supports original export filename (*bovine_muscle*), renamed variants, and dynamic manifests
 // -------------------------------------------------------------
+const DEFAULT_BOVINE_MUSCLE_PATHS = [
+  // Build-time paths injected by Vite
+  ...(typeof __BOVINE_MUSCLE_PATHS__ !== 'undefined' && Array.isArray(__BOVINE_MUSCLE_PATHS__) ? __BOVINE_MUSCLE_PATHS__ : []),
+  // Standardized file name
+  '/models/cow/bovine_muscles.glb',
+  // Original Meshy AI export filename
+  '/models/cow/Meshy_AI_Bovine_Muscle_Anatomy_1010200520_image-to-3d-texture.glb',
+  // Common variations matching *bovine_muscle*
+  '/models/cow/bovine_muscle.glb',
+  '/models/cow/Meshy_AI_Bovine_Muscle_Anatomy.glb',
+  '/models/cow/bovine_muscles_anatomy.glb',
+  '/models/cow/bovine_muscle_anatomy.glb'
+];
+
+async function getCandidateMuscleUrls() {
+  const candidates = [...new Set(DEFAULT_BOVINE_MUSCLE_PATHS)];
+
+  // Try dynamic manifest or dev server API endpoint
+  const endpoints = ['/api/muscle-models', '/models/cow/muscle_manifest.json'];
+  for (const ep of endpoints) {
+    try {
+      const res = await fetch(ep);
+      if (res.ok && !res.headers.get('content-type')?.includes('text/html')) {
+        const list = await res.json();
+        if (Array.isArray(list) && list.length > 0) {
+          list.forEach(p => {
+            if (/bovine.*muscle|muscle.*bovine/i.test(p) && !candidates.includes(p)) {
+              candidates.unshift(p);
+            }
+          });
+          break;
+        }
+      }
+    } catch (_) {}
+  }
+
+  return candidates;
+}
+
 function loadMuscleModel(onComplete) {
   if (isMuscleModelLoaded) {
     if (onComplete) onComplete(muscleModelGroup);
@@ -1525,70 +1752,87 @@ function loadMuscleModel(onComplete) {
     hoverBadge.textContent = state.lang === 'he' ? 'טוען מודל שרירי הבקר התלת-ממדי (HD)...' : 'Loading HD Bovine Muscle Model...';
   }
 
-  const loader = new GLTFLoader();
-  loader.load('/models/cow/bovine_muscles.glb', (gltf) => {
-    const model = gltf.scene;
+  getCandidateMuscleUrls().then(candidateUrls => {
+    let index = 0;
 
-    // Compute bounding box and normalize
-    const box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 2.30 / (maxDim || 1);
-    model.scale.set(scale, scale, scale);
-
-    const center = box.getCenter(new THREE.Vector3());
-    model.position.sub(center.multiplyScalar(scale));
-
-    // Rotate +90 deg around Y so the head (+Z) aligns with the cow (+X)
-    model.rotation.y = Math.PI / 2;
-
-    // Ground hooves nicely at same height as main cow
-    model.position.y += 0.82;
-    model.updateMatrixWorld(true);
-
-    model.traverse((child) => {
-      if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-        child.userData.isOrgan = true;
-        child.userData.organId = 'muscles';
-        child.userData.system = 'muscles';
-        child.userData.labelHe = 'שרירי הבקר ובשר הבהמה (Muscles & Meat)';
-        child.userData.labelEn = 'Bovine Skeletal Musculature & Meat';
-
-        if (child.material) {
-          child.material.clippingPlanes = [clippingPlane];
-          child.material.side = THREE.DoubleSide;
+    function tryLoadNextUrl() {
+      if (index >= candidateUrls.length) {
+        console.error('All candidate bovine muscle models failed to load:', candidateUrls);
+        isMuscleModelLoading = false;
+        if (hoverBadge) {
+          hoverBadge.textContent = state.lang === 'he' ? 'שגיאה בטעינת מודל השרירים' : 'Error loading muscle model';
+          setTimeout(() => hoverBadge.classList.add('hidden'), 3000);
         }
+        return;
       }
-    });
 
-    while (muscleModelGroup.children.length > 0) {
-      muscleModelGroup.remove(muscleModelGroup.children[0]);
-    }
-    muscleModelGroup.add(model);
-    isMuscleModelLoaded = true;
-    isMuscleModelLoading = false;
+      const url = candidateUrls[index++];
+      console.log(`[paraSim] Attempting to load bovine muscle model from: ${url}`);
 
-    if (hoverBadge) {
-      hoverBadge.textContent = state.lang === 'he' ? '✓ מודל השרירים נטען בהצלחה!' : '✓ Muscle Model Loaded!';
-      setTimeout(() => hoverBadge.classList.add('hidden'), 2500);
+      const loader = new GLTFLoader();
+      loader.load(url, (gltf) => {
+        const model = gltf.scene;
+
+        // Compute bounding box and normalize
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const scale = 2.30 / (maxDim || 1);
+        model.scale.set(scale, scale, scale);
+
+        const center = box.getCenter(new THREE.Vector3());
+        model.position.sub(center.multiplyScalar(scale));
+
+        // Rotate +90 deg around Y so the head (+Z) aligns with the cow (+X)
+        model.rotation.y = Math.PI / 2;
+
+        // Ground hooves nicely at same height as main cow
+        model.position.y += 0.82;
+        model.updateMatrixWorld(true);
+
+        model.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            child.userData.isOrgan = true;
+            child.userData.organId = 'muscles';
+            child.userData.system = 'muscles';
+            child.userData.labelHe = 'שרירי הבקר ובשר הבהמה (Muscles & Meat)';
+            child.userData.labelEn = 'Bovine Skeletal Musculature & Meat';
+
+            if (child.material) {
+              child.material.clippingPlanes = [clippingPlane];
+              child.material.side = THREE.DoubleSide;
+            }
+          }
+        });
+
+        while (muscleModelGroup.children.length > 0) {
+          muscleModelGroup.remove(muscleModelGroup.children[0]);
+        }
+        muscleModelGroup.add(model);
+        isMuscleModelLoaded = true;
+        isMuscleModelLoading = false;
+
+        if (hoverBadge) {
+          hoverBadge.textContent = state.lang === 'he' ? '✓ מודל השרירים נטען בהצלחה!' : '✓ Muscle Model Loaded!';
+          setTimeout(() => hoverBadge.classList.add('hidden'), 2500);
+        }
+
+        if (onComplete) onComplete(muscleModelGroup);
+      }, (xhr) => {
+        if (xhr.lengthComputable && hoverBadge) {
+          const pct = Math.round((xhr.loaded / xhr.total) * 100);
+          hoverBadge.classList.remove('hidden');
+          hoverBadge.textContent = state.lang === 'he' ? `טוען מודל שרירים... ${pct}%` : `Loading Muscle Model... ${pct}%`;
+        }
+      }, (err) => {
+        console.warn(`[paraSim] Failed to load candidate ${url}, trying next fallback...`, err);
+        tryLoadNextUrl();
+      });
     }
 
-    if (onComplete) onComplete(muscleModelGroup);
-  }, (xhr) => {
-    if (xhr.lengthComputable && hoverBadge) {
-      const pct = Math.round((xhr.loaded / xhr.total) * 100);
-      hoverBadge.classList.remove('hidden');
-      hoverBadge.textContent = state.lang === 'he' ? `טוען מודל שרירים... ${pct}%` : `Loading Muscle Model... ${pct}%`;
-    }
-  }, (err) => {
-    console.error('Error loading muscle GLB:', err);
-    isMuscleModelLoading = false;
-    if (hoverBadge) {
-      hoverBadge.textContent = state.lang === 'he' ? 'שגיאה בטעינת מודל השרירים' : 'Error loading muscle model';
-      setTimeout(() => hoverBadge.classList.add('hidden'), 3000);
-    }
+    tryLoadNextUrl();
   });
 }
 
@@ -2132,6 +2376,170 @@ function closeModal() {
 }
 
 // -------------------------------------------------------------
+// SUPERMARKET & BUTCHER BEEF CUTS GUIDE (1-19)
+// -------------------------------------------------------------
+function toggleBeefCutsExperience(enable) {
+  state.isBeefCutsActive = enable !== undefined ? enable : !state.isBeefCutsActive;
+
+  const bannerBtn = document.getElementById('btn-toggle-beef-cuts');
+  const bannerStatus = document.getElementById('beef-cuts-btn-status');
+  const pillBtn = document.getElementById('btn-specimen-beef-cuts');
+
+  if (state.isBeefCutsActive) {
+    // Automatically switch to the muscular system view if not active
+    if (state.skinMode !== 'muscle') {
+      setSkinMode('muscle');
+    }
+    activateWebGLMode();
+
+    if (bannerBtn) bannerBtn.classList.add('active');
+    if (bannerStatus) bannerStatus.textContent = 'פעיל ✓';
+    if (pillBtn) pillBtn.classList.add('active');
+
+    if (beefCutsVisualizer) {
+      beefCutsVisualizer.setVisible(true);
+    }
+
+    setMode('beef-cuts');
+    renderBeefCutsPanel();
+    selectBeefCut(state.selectedBeefCutId || 'entrecote', false);
+    sound.playSelect();
+  } else {
+    if (bannerBtn) bannerBtn.classList.remove('active');
+    if (bannerStatus) bannerStatus.textContent = 'הפעל מפה ❯';
+    if (pillBtn) pillBtn.classList.remove('active');
+
+    if (beefCutsVisualizer) {
+      beefCutsVisualizer.setVisible(false);
+    }
+    setMode('explore');
+  }
+}
+
+function renderBeefCutsPanel() {
+  const grid = document.getElementById('beef-cuts-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  const filter = state.beefCutsFilter || 'all';
+  const search = (state.beefCutsSearch || '').trim().toLowerCase();
+
+  const filteredCuts = BEEF_CUTS.filter(cut => {
+    // Section / Cooking method filter
+    if (filter === 'forequarter' && cut.section !== 'forequarter') return false;
+    if (filter === 'hindquarter' && cut.section !== 'hindquarter') return false;
+    if (filter === 'grill' && !cut.cookingMethods.some(m => m.includes('גריל') || m.includes('סטייק'))) return false;
+    if (filter === 'stew' && !cut.cookingMethods.some(m => m.includes('בישול') || m.includes('סו-וויד') || m.includes('חמין') || m.includes('קדרה'))) return false;
+
+    // Search query
+    if (search) {
+      const matchNum = String(cut.number).includes(search);
+      const matchHe = cut.nameHe.toLowerCase().includes(search) || cut.aliasesHe.toLowerCase().includes(search);
+      const matchEn = cut.nameEn.toLowerCase().includes(search);
+      if (!matchNum && !matchHe && !matchEn) return false;
+    }
+    return true;
+  });
+
+  const countLabel = document.getElementById('beef-cuts-count-label');
+  if (countLabel) countLabel.textContent = `${filteredCuts.length} נתחים`;
+
+  filteredCuts.forEach(cut => {
+    const tile = document.createElement('div');
+    tile.className = `beef-cut-tile ${cut.id === state.selectedBeefCutId ? 'active' : ''}`;
+    tile.dataset.cutId = cut.id;
+
+    tile.innerHTML = `
+      <div class="tile-number-badge">${cut.number}</div>
+      <div class="tile-texts">
+        <span class="tile-name">${cut.nameHe}</span>
+        <span class="tile-sub">${cut.nameEn}</span>
+      </div>
+    `;
+
+    tile.addEventListener('click', () => {
+      selectBeefCut(cut.id, true);
+    });
+
+    grid.appendChild(tile);
+  });
+
+  renderBeefCutSpotlight(state.selectedBeefCutId || 'entrecote');
+}
+
+function renderBeefCutSpotlight(cutId) {
+  const cut = BEEF_CUTS.find(c => c.id === cutId) || BEEF_CUTS[0];
+  if (!cut) return;
+
+  const numEl = document.getElementById('spotlight-number');
+  const nameEl = document.getElementById('spotlight-name');
+  const aliasesEl = document.getElementById('spotlight-aliases');
+  const enEl = document.getElementById('spotlight-en');
+  const secEl = document.getElementById('spotlight-section-tag');
+  const fatEl = document.getElementById('spotlight-fat-tag');
+  const descEl = document.getElementById('spotlight-characteristics');
+  const dishesEl = document.getElementById('spotlight-dishes');
+  const tipsEl = document.getElementById('spotlight-tips');
+  const chipsContainer = document.getElementById('spotlight-cooking-chips');
+
+  if (numEl) numEl.textContent = cut.number;
+  if (nameEl) nameEl.textContent = cut.nameHe;
+  if (aliasesEl) aliasesEl.textContent = cut.aliasesHe;
+  if (enEl) enEl.textContent = cut.nameEn;
+
+  if (secEl) {
+    secEl.textContent = cut.sectionHe;
+    secEl.className = `cut-section-tag ${cut.section}`;
+  }
+
+  if (fatEl) fatEl.textContent = `רמת שומן: ${cut.fatLevel}`;
+  if (descEl) descEl.textContent = cut.characteristics;
+  if (dishesEl) dishesEl.textContent = cut.popularDishes;
+  if (tipsEl) tipsEl.textContent = cut.chefTips;
+
+  if (chipsContainer) {
+    chipsContainer.innerHTML = '';
+    cut.cookingMethods.forEach(method => {
+      const chip = document.createElement('span');
+      chip.className = 'cooking-chip';
+      let icon = '🔥';
+      if (method.includes('סו-וויד')) icon = '⏱️';
+      else if (method.includes('עישון')) icon = '💨';
+      else if (method.includes('תנור') || method.includes('אפייה')) icon = '🍳';
+      else if (method.includes('טחינה')) icon = '🥩';
+      else if (method.includes('מרק') || method.includes('בישול')) icon = '🍲';
+      chip.textContent = `${icon} ${method}`;
+      chipsContainer.appendChild(chip);
+    });
+  }
+
+  // Update active state in list
+  document.querySelectorAll('.beef-cut-tile').forEach(tile => {
+    tile.classList.toggle('active', tile.dataset.cutId === cut.id);
+  });
+}
+
+function selectBeefCut(cutIdentifier, shouldMoveCam = true) {
+  const cut = BEEF_CUTS.find(c => c.id === cutIdentifier || c.number === cutIdentifier);
+  if (!cut) return;
+
+  state.selectedBeefCutId = cut.id;
+  sound.playSelect();
+
+  renderBeefCutSpotlight(cut.id);
+
+  if (beefCutsVisualizer) {
+    beefCutsVisualizer.selectCut(cut.id);
+  }
+
+  if (shouldMoveCam && cameraController) {
+    const target = new THREE.Vector3(...cut.cameraTarget);
+    const pos = new THREE.Vector3(...cut.cameraPos);
+    cameraController.moveTo(pos, target, 0.85);
+  }
+}
+
+// -------------------------------------------------------------
 // RAYCASTING & MOUSE INTERACTION
 // -------------------------------------------------------------
 function onCanvasMouseMove(event) {
@@ -2141,7 +2549,40 @@ function onCanvasMouseMove(event) {
 
   raycaster.setFromCamera(mouse, camera);
 
-  // Context-aware object filtering: only allow objects relevant to the current view
+  // 1. High-priority hit testing for Supermarket Beef Cuts markers
+  if (beefCutsVisualizer && beefCutsVisualizer.isVisible()) {
+    const cutHits = raycaster.intersectObjects(beefCutsVisualizer.getIntersectables(), true);
+    if (cutHits.length > 0) {
+      let hitObj = cutHits[0].object;
+      while (hitObj && !hitObj.userData?.cut && hitObj.parent) {
+        hitObj = hitObj.parent;
+      }
+      const cut = hitObj?.userData?.cut;
+      if (cut) {
+        hoveredOrgan = null;
+        hoverBadge.classList.remove('hidden');
+        hoverBadge.textContent = `🥩 מס' ${cut.number}: ${cut.nameHe} (${cut.nameEn})`;
+        const canvasRect = canvas.getBoundingClientRect();
+        const badgeW = hoverBadge.offsetWidth || 220;
+        const badgeH = hoverBadge.offsetHeight || 36;
+        const pad = 16;
+        const mouseX = event.clientX - canvasRect.left;
+        const mouseY = event.clientY - canvasRect.top;
+        let bx = mouseX > canvasRect.width * 0.45 ? (mouseX - badgeW - pad) : (mouseX + pad);
+        let by = mouseY < 120 ? (mouseY + pad + 10) : (mouseY - badgeH - pad);
+        bx = Math.max(pad, Math.min(bx, canvasRect.width - badgeW - pad));
+        by = Math.max(pad, Math.min(by, canvasRect.height - badgeH - pad));
+        hoverBadge.style.left = `${bx}px`;
+        hoverBadge.style.top = `${by}px`;
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
+  }
+
+  canvas.style.cursor = 'default';
+
+  // 2. Standard organ / system raycasting
   const isSolidSkinMode = state.skinMode === 'solid';
   const isAnatomyOrDefectView = state.activeMode === 'treifot' || state.activeMode === 'bedikah' || state.activeMode === 'shechita';
 
@@ -2223,15 +2664,9 @@ function onCanvasMouseMove(event) {
       const mouseX = event.clientX - canvasRect.left;
       const mouseY = event.clientY - canvasRect.top;
 
-      // Dynamic free-space placement:
-      // If cursor is on the right half of the canvas, free space is to the left.
-      // If cursor is on the left half of the canvas, free space is to the right.
       let bx = mouseX > canvasRect.width * 0.45 ? (mouseX - badgeW - pad) : (mouseX + pad);
-
-      // Vertical placement: if cursor is near top quick-bar, show below cursor; otherwise above
       let by = mouseY < 120 ? (mouseY + pad + 10) : (mouseY - badgeH - pad);
 
-      // Clamp within canvas boundaries
       bx = Math.max(pad, Math.min(bx, canvasRect.width - badgeW - pad));
       by = Math.max(pad, Math.min(by, canvasRect.height - badgeH - pad));
 
@@ -2268,10 +2703,26 @@ function onCanvasClick(e) {
     // Rotation or pan gesture completed: do NOT snap camera or trigger selection!
     return;
   }
+
+  // Check Beef Cuts 3D marker hits
+  if (beefCutsVisualizer && beefCutsVisualizer.isVisible()) {
+    const cutHits = raycaster.intersectObjects(beefCutsVisualizer.getIntersectables(), true);
+    if (cutHits.length > 0) {
+      let hitObj = cutHits[0].object;
+      while (hitObj && !hitObj.userData?.cut && hitObj.parent) {
+        hitObj = hitObj.parent;
+      }
+      const cut = hitObj?.userData?.cut;
+      if (cut) {
+        selectBeefCut(cut.id, true);
+        return;
+      }
+    }
+  }
+
   if (hoveredOrgan && hoveredOrgan.id) {
     setMode('explore');
     selectOrgan(hoveredOrgan.id);
-    // Preserves camera orientation without rigid snapping
   }
 }
 
@@ -2341,6 +2792,11 @@ function animate() {
   if (muscleModelGroup) {
     muscleModelGroup.rotation.y = importedModelGroup.rotation.y;
   }
+  // Keep supermarket beef cuts visualizer synced with cow model rotation
+  if (beefCutsVisualizer && beefCutsVisualizer.group) {
+    beefCutsVisualizer.group.rotation.y = importedModelGroup.rotation.y;
+    beefCutsVisualizer.update(time);
+  }
 
   cameraController.update(delta);
   treifahVisualizer.update(time);
@@ -2362,7 +2818,11 @@ window.__simcowleh = {
   importedMaterials,
   importedModelGroup,
   muscleModelGroup,
+  beefCutsVisualizer,
   loadMuscleModel,
+  toggleBeefCutsExperience,
+  selectBeefCut,
+  BEEF_CUTS,
   state,
   switchPrimarySpecimen,
   setSkinMode
