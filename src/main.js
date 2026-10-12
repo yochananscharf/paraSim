@@ -12,6 +12,7 @@ import { SHECHITA_SIMANIM, CHAMESH_HALACHOT, BEDIKAT_HASAKIN } from './data/shec
 import { SketchfabController } from './scene/sketchfabController.js';
 import { BEEF_CUTS, SECTION_METADATA } from './data/beefCutsData.js';
 import { BeefCutsVisualizer } from './scene/beefCutsVisualizer.js';
+import { fetchAndLoadSecureGltf } from './utils/modelDecryptor.js';
 
 // Application State
 const state = {
@@ -1154,8 +1155,8 @@ function initUI() {
   activateWebGLMode();
   onWindowResize();
 
-  // Automatically load the converted Blender bovine 3D model on startup!
-  loadModelFromUrl('/models/cow/cow_anatomy.glb');
+  // Automatically load the converted Blender bovine 3D model on startup (encrypted .dat asset)
+  loadModelFromUrl('/models/cow/cow_anatomy.dat');
 
   // Listen for clicks on authentic 3D model organs to open Halachic data
   window.addEventListener('sketchfabOrganClick', (e) => {
@@ -1320,10 +1321,17 @@ function loadModelFromUrl(url) {
   const loader = new GLTFLoader();
   if (hoverBadge) {
     hoverBadge.classList.remove('hidden');
-    hoverBadge.textContent = state.lang === 'he' ? 'טוען מודל תלת-ממד של הפרה מ-Blender...' : 'Loading Blender 3D Cow Model...';
+    hoverBadge.textContent = state.lang === 'he' ? 'טוען מודל תלת-ממד של הפרה...' : 'Loading 3D Cow Model...';
   }
 
-  loader.load(url, (gltf) => {
+  const onProgress = (pct) => {
+    if (hoverBadge) {
+      hoverBadge.classList.remove('hidden');
+      hoverBadge.textContent = state.lang === 'he' ? `טוען מודל בקר... ${pct}%` : `Loading Cow Model... ${pct}%`;
+    }
+  };
+
+  const handleLoadedGltf = (gltf) => {
     const model = gltf.scene;
     let meshCount = 0;
 
@@ -1683,16 +1691,29 @@ function loadModelFromUrl(url) {
         setTimeout(() => hoverBadge.classList.add('hidden'), 3500);
       }
     } else {
-      console.warn('The loaded GLB contains 0 meshes.');
+      console.warn('The loaded model contains 0 meshes.');
       const loadingOverlay = document.getElementById('model-loading-overlay');
       if (loadingOverlay) loadingOverlay.classList.add('hidden');
       if (hoverBadge) hoverBadge.classList.add('hidden');
     }
-  }, undefined, (err) => {
-    console.warn('Could not auto-load GLB model from url:', err);
-    const loadingOverlay = document.getElementById('model-loading-overlay');
-    if (loadingOverlay) loadingOverlay.classList.add('hidden');
-    if (hoverBadge) hoverBadge.classList.add('hidden');
+  };
+
+  fetchAndLoadSecureGltf(url, loader, onProgress, handleLoadedGltf, (err) => {
+    if (url.endsWith('.dat')) {
+      const fallbackUrl = url.replace(/\.dat$/, '.glb');
+      console.warn(`[paraSim] Encrypted asset load failed, attempting fallback to: ${fallbackUrl}`, err);
+      fetchAndLoadSecureGltf(fallbackUrl, loader, onProgress, handleLoadedGltf, (fallbackErr) => {
+        console.error('Could not auto-load 3D model from url:', fallbackErr);
+        const loadingOverlay = document.getElementById('model-loading-overlay');
+        if (loadingOverlay) loadingOverlay.classList.add('hidden');
+        if (hoverBadge) hoverBadge.classList.add('hidden');
+      });
+    } else {
+      console.error('Could not auto-load 3D model from url:', err);
+      const loadingOverlay = document.getElementById('model-loading-overlay');
+      if (loadingOverlay) loadingOverlay.classList.add('hidden');
+      if (hoverBadge) hoverBadge.classList.add('hidden');
+    }
   });
 }
 
@@ -1701,6 +1722,8 @@ function loadModelFromUrl(url) {
 // Supports original export filename (*bovine_muscle*), renamed variants, and dynamic manifests
 // -------------------------------------------------------------
 const DEFAULT_BOVINE_MUSCLE_PATHS = [
+  // Protected encrypted production asset (.dat)
+  '/models/cow/bovine_muscles.dat',
   // Build-time paths injected by Vite
   ...(typeof __BOVINE_MUSCLE_PATHS__ !== 'undefined' && Array.isArray(__BOVINE_MUSCLE_PATHS__) ? __BOVINE_MUSCLE_PATHS__ : []),
   // Standardized file name
@@ -1770,7 +1793,14 @@ function loadMuscleModel(onComplete) {
       console.log(`[paraSim] Attempting to load bovine muscle model from: ${url}`);
 
       const loader = new GLTFLoader();
-      loader.load(url, (gltf) => {
+      const onProgress = (pct) => {
+        if (hoverBadge) {
+          hoverBadge.classList.remove('hidden');
+          hoverBadge.textContent = state.lang === 'he' ? `טוען מודל שרירים... ${pct}%` : `Loading Muscle Model... ${pct}%`;
+        }
+      };
+
+      fetchAndLoadSecureGltf(url, loader, onProgress, (gltf) => {
         const model = gltf.scene;
 
         // Compute bounding box and normalize
@@ -1820,12 +1850,6 @@ function loadMuscleModel(onComplete) {
         }
 
         if (onComplete) onComplete(muscleModelGroup);
-      }, (xhr) => {
-        if (xhr.lengthComputable && hoverBadge) {
-          const pct = Math.round((xhr.loaded / xhr.total) * 100);
-          hoverBadge.classList.remove('hidden');
-          hoverBadge.textContent = state.lang === 'he' ? `טוען מודל שרירים... ${pct}%` : `Loading Muscle Model... ${pct}%`;
-        }
       }, (err) => {
         console.warn(`[paraSim] Failed to load candidate ${url}, trying next fallback...`, err);
         tryLoadNextUrl();
