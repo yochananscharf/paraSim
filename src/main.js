@@ -226,13 +226,21 @@ scene.add(muscleModelGroup);
 let isMuscleModelLoading = false;
 let isMuscleModelLoaded = false;
 
+// Helper to resolve public asset URLs across root domains and GitHub Pages subpaths
+function assetUrl(relPath) {
+  const base = import.meta.env.BASE_URL || './';
+  const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+  const cleanRel = relPath.startsWith('/') ? relPath.slice(1) : relPath;
+  return `${normalizedBase}${cleanRel}`;
+}
+
 // Texture loader & cache for the converted Blender model
 const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map();
 function getCowTexture(num) {
   const str = String(num);
   if (!textureCache.has(str)) {
-    const tex = textureLoader.load(`/models/cow/textures/${str}.jpg`);
+    const tex = textureLoader.load(assetUrl(`models/cow/textures/${str}.jpg`));
     tex.colorSpace = THREE.SRGBColorSpace;
     textureCache.set(str, tex);
   }
@@ -1156,7 +1164,7 @@ function initUI() {
   onWindowResize();
 
   // Automatically load the converted Blender bovine 3D model on startup (encrypted .dat asset)
-  loadModelFromUrl('/models/cow/cow_anatomy.dat');
+  loadModelFromUrl(assetUrl('models/cow/cow_anatomy.dat'));
 
   // Listen for clicks on authentic 3D model organs to open Halachic data
   window.addEventListener('sketchfabOrganClick', (e) => {
@@ -1723,25 +1731,25 @@ function loadModelFromUrl(url) {
 // -------------------------------------------------------------
 const DEFAULT_BOVINE_MUSCLE_PATHS = [
   // Protected encrypted production asset (.dat)
-  '/models/cow/bovine_muscles.dat',
+  assetUrl('models/cow/bovine_muscles.dat'),
   // Build-time paths injected by Vite
-  ...(typeof __BOVINE_MUSCLE_PATHS__ !== 'undefined' && Array.isArray(__BOVINE_MUSCLE_PATHS__) ? __BOVINE_MUSCLE_PATHS__ : []),
+  ...(typeof __BOVINE_MUSCLE_PATHS__ !== 'undefined' && Array.isArray(__BOVINE_MUSCLE_PATHS__) ? __BOVINE_MUSCLE_PATHS__.map(p => assetUrl(p)) : []),
   // Standardized file name
-  '/models/cow/bovine_muscles.glb',
+  assetUrl('models/cow/bovine_muscles.glb'),
   // Original Meshy AI export filename
-  '/models/cow/Meshy_AI_Bovine_Muscle_Anatomy_1010200520_image-to-3d-texture.glb',
+  assetUrl('models/cow/Meshy_AI_Bovine_Muscle_Anatomy_1010200520_image-to-3d-texture.glb'),
   // Common variations matching *bovine_muscle*
-  '/models/cow/bovine_muscle.glb',
-  '/models/cow/Meshy_AI_Bovine_Muscle_Anatomy.glb',
-  '/models/cow/bovine_muscles_anatomy.glb',
-  '/models/cow/bovine_muscle_anatomy.glb'
+  assetUrl('models/cow/bovine_muscle.glb'),
+  assetUrl('models/cow/Meshy_AI_Bovine_Muscle_Anatomy.glb'),
+  assetUrl('models/cow/bovine_muscles_anatomy.glb'),
+  assetUrl('models/cow/bovine_muscle_anatomy.glb')
 ];
 
 async function getCandidateMuscleUrls() {
   const candidates = [...new Set(DEFAULT_BOVINE_MUSCLE_PATHS)];
 
   // Try dynamic manifest or dev server API endpoint
-  const endpoints = ['/api/muscle-models', '/models/cow/muscle_manifest.json'];
+  const endpoints = [assetUrl('api/muscle-models'), assetUrl('models/cow/muscle_manifest.json')];
   for (const ep of endpoints) {
     try {
       const res = await fetch(ep);
@@ -1749,8 +1757,9 @@ async function getCandidateMuscleUrls() {
         const list = await res.json();
         if (Array.isArray(list) && list.length > 0) {
           list.forEach(p => {
-            if (/bovine.*muscle|muscle.*bovine/i.test(p) && !candidates.includes(p)) {
-              candidates.unshift(p);
+            const fullPath = assetUrl(p);
+            if (/bovine.*muscle|muscle.*bovine/i.test(p) && !candidates.includes(fullPath)) {
+              candidates.unshift(fullPath);
             }
           });
           break;

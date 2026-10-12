@@ -7,8 +7,9 @@ function getMuscleModelPaths() {
   if (!fs.existsSync(modelsDir)) return [];
   const files = fs.readdirSync(modelsDir);
   return files
-    .filter(f => f.toLowerCase().endsWith('.glb') && /bovine.*muscle|muscle.*bovine/i.test(f))
-    .map(f => `/models/cow/${f}`);
+    .filter(f => (f.toLowerCase().endsWith('.dat') || f.toLowerCase().endsWith('.glb')) && /bovine.*muscle|muscle.*bovine/i.test(f))
+    .sort((a, b) => (a.endsWith('.dat') ? -1 : b.endsWith('.dat') ? 1 : 0))
+    .map(f => `models/cow/${f}`);
 }
 
 function syncMuscleManifest() {
@@ -24,6 +25,7 @@ function syncMuscleManifest() {
 syncMuscleManifest();
 
 export default defineConfig({
+  base: './',
   define: {
     __BOVINE_MUSCLE_PATHS__: JSON.stringify(getMuscleModelPaths())
   },
